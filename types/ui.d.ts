@@ -1,18 +1,19 @@
 declare module '@/components/ui/toast/use-toast' {
+  import * as React from 'react';
+  import { ToastAction } from '@/components/ui/toast/toast';
+  
   interface ToastProps {
     variant?: 'default' | 'destructive';
     title?: string;
     description?: string;
+    duration?: number;
   }
 
-  interface ToastActionElement {
-    altText: string;
-    onClick: () => void;
-    children: React.ReactNode;
-  }
+  type ToastActionElement = React.ReactElement<typeof ToastAction>;
 
   interface ToastOptions extends ToastProps {
     id?: string;
+    action?: React.ReactNode;
   }
 
   type Toast = ToastOptions;
@@ -20,6 +21,7 @@ declare module '@/components/ui/toast/use-toast' {
   interface UseToastReturn {
     toast: (props: Toast) => void;
     dismiss: (toastId?: string) => void;
+    toasts: Toast[];
   }
 
   export function useToast(): UseToastReturn;
