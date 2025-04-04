@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { Home, LineChart, Package, Package2, PanelLeft, Settings, ShoppingCart, Users2 } from 'lucide-react';
+import Link from 'next/link';
 
 import {
   Breadcrumb,
@@ -12,7 +12,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Analytics } from '@vercel/analytics/react';
 import { User } from './user';
 import { VercelLogo } from '@/components/icons';
 import Providers from './providers';
@@ -38,7 +37,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </header>
               <main className="grid flex-1 items-start gap-2 p-4 sm:px-6 sm:py-0 md:gap-4 bg-muted/40">{children}</main>
             </div>
-            <Analytics />
             <Toaster />
           </main>
         </VerificationGate>
@@ -56,7 +54,7 @@ function DesktopNav() {
           className="group flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:h-8 md:w-8 md:text-base"
         >
           <VercelLogo className="h-3 w-3 transition-all group-hover:scale-110" />
-          <span className="sr-only">ABC TEAM</span>
+          <span className="sr-only">IntentPay Team</span>
         </Link>
 
         <NavItem href="/analytics" label="Dashboard">
@@ -113,7 +111,7 @@ function MobileNav() {
             className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:text-base"
           >
             <Package2 className="h-5 w-5 transition-all group-hover:scale-110" />
-            <span className="sr-only">ABC TEAM</span>
+            <span className="sr-only">IntentPay Team</span>
           </Link>
           <Link
             href="/analytics"

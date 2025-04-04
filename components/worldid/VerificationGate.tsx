@@ -343,10 +343,10 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
     localStorage.setItem('worldid_user', JSON.stringify(mockUserData));
 
     toast({
-      title: "Test verification enabled",
+      title: 'Test verification enabled',
       description: "You've bypassed verification using test mode",
-      variant: "default",
-      duration: 3000,
+      variant: 'default',
+      duration: 3000
     });
     
     // Update state to allow access
@@ -469,9 +469,7 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
             </div>
           </div>
           <CardTitle className="text-2xl">Verification Required</CardTitle>
-          <CardDescription>
-            Please verify with World ID to access IntentPay
-          </CardDescription>
+          <CardDescription>Please verify with World ID to access IntentPay</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (

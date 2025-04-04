@@ -66,9 +66,7 @@ export default function WalletHomePage() {
         )}
 
         {/* Wallet Balance */}
-        <div className="text-3xl font-bold my-3">
-          {formatCurrency(usdcBalance)}
-        </div>
+        <div className="text-3xl font-bold my-3">{formatCurrency(usdcBalance)}</div>
 
         <div className="flex items-center gap-1 bg-white/20 text-white px-3 py-1 rounded-full text-sm">
           <Wallet className="h-3 w-3" />
