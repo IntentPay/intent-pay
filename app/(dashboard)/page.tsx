@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { truncateAddress, formatCurrency } from '@/lib/utils';
 import { MiniKit } from '@worldcoin/minikit-js';
 
-// 用户信息类型
+// User information type
 interface WorldIDUser {
   worldId: string;
   username: string;
@@ -16,7 +16,7 @@ interface WorldIDUser {
 }
 
 export default function WalletHomePage() {
-  // 状态管理用户信息
+  // State management for user information
   const [user, setUser] = useState<WorldIDUser | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -30,7 +30,7 @@ export default function WalletHomePage() {
     { id: 4, type: 'send', amount: '-20 USDC', date: '2025-03-30', to: '0x9876...5432', status: 'pending' }
   ];
   
-  // 从本地存储加载用户数据
+  // Load user data from local storage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -39,7 +39,7 @@ export default function WalletHomePage() {
           setUser(JSON.parse(userData));
         }
         
-        // 另外也尝试从 MiniKit 获取最新数据
+        // Also try to get the latest data from MiniKit
         if (MiniKit.isInstalled() && MiniKit.user) {
           console.log('MiniKit user:', MiniKit.user);
         }
@@ -56,10 +56,7 @@ export default function WalletHomePage() {
       {/* Wallet Header */}
       <div className="flex flex-col items-center justify-center bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl p-6 shadow-lg">
         <h1 className="text-2xl font-bold">IntentPay</h1>
-        <div className="mt-1 mb-2">
-          <span className="text-sm opacity-80">Your gasless wallet for USDC transfers and intent trading</span>
-        </div>
-        
+
         {user && (
           <div className="mt-1 mb-3 flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5">
             <User className="h-4 w-4" />
