@@ -4,7 +4,7 @@ import { MiniKit, VerifyCommandInput, VerificationLevel, ISuccessResult } from '
 import { ReactNode, useState } from 'react';
 import { useWorldID } from '@/lib/hooks/useWorldID';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Shield, AlertTriangle, Check, Bug } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -111,7 +111,7 @@ const handleVerify = async () => {
             </div>
           )}
 
-          {!isWorldApp && process.env.NODE_ENV !== 'development' ? (
+          {!isWorldApp && (
             <div className="bg-amber-50 text-amber-700 p-4 rounded-md">
               <p className="font-medium">You're not using World App</p>
               <p className="text-sm mt-1">
@@ -126,44 +126,44 @@ const handleVerify = async () => {
                 Download World App
               </a>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <Button 
-                onClick={handleVerify} 
-                className="w-full" 
-                size="lg"
-                disabled={isVerifying || verificationInProgress}
-              >
-                {isVerifying || verificationInProgress ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Verifying...
-                  </>
-                ) : (
-                  <>
-                    <Shield className="mr-2 h-4 w-4" />
-                    Verify with World ID
-                  </>
-                )}
-              </Button>
-              
-              <div className="relative flex items-center">
-                <div className="flex-grow border-t border-gray-300"></div>
-                <span className="mx-4 flex-shrink text-xs text-gray-500">OR</span>
-                <div className="flex-grow border-t border-gray-300"></div>
-              </div>
-              
-              <Button 
-                onClick={handleTestVerify} 
-                className="w-full" 
-                variant="outline"
-                size="lg"
-              >
-                <Bug className="mr-2 h-4 w-4" />
-                Test Mode (Skip Verification)
-              </Button>
-            </div>
           )}
+          
+          <div className="space-y-3">
+            <Button 
+              onClick={handleVerify} 
+              className="w-full" 
+              size="lg"
+              disabled={isVerifying || verificationInProgress}
+            >
+              {isVerifying || verificationInProgress ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                <>
+                  <Shield className="mr-2 h-4 w-4" />
+                  Verify with World ID
+                </>
+              )}
+            </Button>
+            
+            <div className="relative flex items-center">
+              <div className="flex-grow border-t border-gray-300"></div>
+              <span className="mx-4 flex-shrink text-xs text-gray-500">OR</span>
+              <div className="flex-grow border-t border-gray-300"></div>
+            </div>
+            
+            <Button 
+              onClick={handleTestVerify} 
+              className="w-full" 
+              variant="outline"
+              size="lg"
+            >
+              <Bug className="mr-2 h-4 w-4" />
+              Test Mode (Skip Verification)
+            </Button>
+          </div>
 
           {process.env.NODE_ENV === 'development' && !isWorldApp && (
             <div className="bg-blue-50 text-blue-700 p-3 rounded-md mt-4">
