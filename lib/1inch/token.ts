@@ -39,6 +39,62 @@ interface CachedTokenData {
 // Cache duration in milliseconds (30 minutes)
 const CACHE_DURATION = 30 * 60 * 1000;
 
+// USDC token addresses for different chains
+export const USDC_ADDRESSES: Record<number, string> = {
+  1: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // Ethereum Mainnet
+  10: '0x7F5c764cBc14f9669B88837ca1490cCa17c31607', // Optimism
+  56: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', // Binance Smart Chain
+  137: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174', // Polygon
+  42161: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', // Arbitrum One
+  43114: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E', // Avalanche
+  // 添加更多链的USDC地址
+};
+
+/**
+ * Get the USDC token address for a specific chain
+ */
+export function getUsdcAddressForChain(chainId: number): string | undefined {
+  return USDC_ADDRESSES[chainId];
+}
+
+/**
+ * Get USDC token info for a specific chain
+ */
+export async function getUsdcTokenInfo(chainId: number): Promise<TokenInfoDto | null> {
+  const usdcAddress = getUsdcAddressForChain(chainId);
+  if (!usdcAddress) return null;
+  
+  const tokenList = await getMultiChainTokenList();
+  return tokenList.tokens.find(token => 
+    token.chainId === chainId && 
+    token.address.toLowerCase() === usdcAddress.toLowerCase()
+  ) || null;
+}
+
+/**
+ * Search tokens using the 1inch Token API's search endpoint
+ */
+export async function searchTokensApi(
+  query: string,
+  chainId: number,
+  limit: number = 10
+): Promise<TokenInfoDto[]> {
+  try {
+    const response = await axios.get('/api/1inch/token/search', {
+      params: {
+        query,
+        chainId,
+        limit
+      }
+    });
+    
+    return response.data || [];
+  } catch (error) {
+    console.error('Error searching tokens:', error);
+    return [];
+  }
+}
+
 /**
  * Get all 1inch whitelisted tokens across multiple chains
  * Uses localStorage caching to improve performance and backend API route for security

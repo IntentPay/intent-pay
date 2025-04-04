@@ -5,6 +5,13 @@
 export const INCH_API_KEY = process.env.ONEINCH_API_KEY || '';
 export const FUSION_API_URL = 'https://fusion.1inch.io/v1.0';
 
+// Export config object for easier imports
+export const config1inch = {
+  apiKey: INCH_API_KEY,
+  referrerAddress: process.env.ONEINCH_REFERRER_ADDRESS,
+  fusionApiUrl: FUSION_API_URL
+};
+
 // Supported chains for Fusion+ integration
 export const SUPPORTED_CHAINS = {
   ARBITRUM: 42161,

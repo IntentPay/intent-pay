@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { createOrder, getQuote, getCrossChainQuote } from '@/lib/1inch/fusion';
-import { getMultiChainTokenList, getTokensByChain, searchTokens, TokenInfoDto } from '@/lib/1inch/token';
+import { getMultiChainTokenList, getTokensByChain, searchTokensApi, TokenInfoDto, getUsdcTokenInfo } from '@/lib/1inch/token';
 import { SUPPORTED_CHAINS, CHAIN_NAMES } from '@/lib/1inch/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast/use-toast';
-import { ArrowDown, Search, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowDown, Search, Loader2, RefreshCw, X, Check, Settings } from 'lucide-react';
 
 export function FusionSwapForm() {
   const { toast } = useToast();
@@ -27,7 +27,6 @@ export function FusionSwapForm() {
   const [filteredTokens, setFilteredTokens] = useState<TokenInfoDto[]>([]);
   const [isLoadingTokens, setIsLoadingTokens] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [showFromTokenSelector, setShowFromTokenSelector] = useState<boolean>(false);
   const [showToTokenSelector, setShowToTokenSelector] = useState<boolean>(false);
   const [selectedFromToken, setSelectedFromToken] = useState<TokenInfoDto | null>(null);
   const [selectedToToken, setSelectedToToken] = useState<TokenInfoDto | null>(null);
@@ -49,15 +48,47 @@ export function FusionSwapForm() {
   
   const walletAddress = getUserAddress();
   
-  // Load token list when component mounts
+  // Load USDC token as the default from token when source chain changes
+  useEffect(() => {
+    async function loadUsdcToken() {
+      try {
+        const usdcToken = await getUsdcTokenInfo(sourceChainId);
+        if (usdcToken) {
+          setFromToken(usdcToken.address);
+          setSelectedFromToken(usdcToken);
+        } else {
+          // If USDC not found for this chain, clear the selection
+          setFromToken('');
+          setSelectedFromToken(null);
+          console.warn(`USDC not found for chain ID ${sourceChainId}`);
+        }
+      } catch (error) {
+        console.error('Error loading USDC token:', error);
+      }
+    }
+    
+    loadUsdcToken();
+  }, [sourceChainId]);
+  
+  // Load token list when component mounts or chain changes
   useEffect(() => {
     async function loadTokens() {
       setIsLoadingTokens(true);
       try {
-        const tokenListData = await getMultiChainTokenList();
-        const chainTokens = getTokensByChain(isCrossChain ? sourceChainId : destinationChainId, tokenListData);
-        setTokenList(chainTokens);
-        setFilteredTokens(chainTokens);
+        // Always load tokens for the destination chain
+        const chainIdToUse = isCrossChain ? destinationChainId : sourceChainId;
+        
+        if (searchQuery.trim()) {
+          // Use the search API to get tokens
+          const searchResults = await searchTokensApi(searchQuery, chainIdToUse, 20);
+          setFilteredTokens(searchResults);
+        } else {
+          // Use the cached token list
+          const tokenListData = await getMultiChainTokenList();
+          const chainTokens = getTokensByChain(chainIdToUse, tokenListData);
+          setTokenList(chainTokens);
+          setFilteredTokens(chainTokens);
+        }
       } catch (error) {
         console.error('Error loading tokens:', error);
         toast({
@@ -71,18 +102,7 @@ export function FusionSwapForm() {
     }
     
     loadTokens();
-  }, [sourceChainId, destinationChainId, isCrossChain, toast]);
-  
-  // Filter tokens based on search query
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredTokens(tokenList);
-      return;
-    }
-    
-    const results = searchTokens(searchQuery, isCrossChain ? sourceChainId : destinationChainId);
-    setFilteredTokens(results.length > 0 ? results : tokenList);
-  }, [searchQuery, tokenList, sourceChainId, destinationChainId, isCrossChain]);
+  }, [sourceChainId, destinationChainId, isCrossChain, searchQuery, toast]);
   
   // Get quote when inputs change
   useEffect(() => {
@@ -182,41 +202,74 @@ export function FusionSwapForm() {
     }
   };
   
-  const handleSelectFromToken = (token: TokenInfoDto) => {
-    setFromToken(token.address);
-    setSelectedFromToken(token);
-    setShowFromTokenSelector(false);
-  };
-  
   const handleSelectToToken = (token: TokenInfoDto) => {
     setToToken(token.address);
     setSelectedToToken(token);
     setShowToTokenSelector(false);
   };
   
-  const handleSwitchTokens = () => {
-    if (selectedFromToken && selectedToToken) {
-      setSelectedFromToken(selectedToToken);
-      setSelectedToToken(selectedFromToken);
-      setFromToken(selectedToToken.address);
-      setToToken(selectedFromToken.address);
-    }
-  };
-  
   return (
-    <div className="p-6 bg-white rounded-lg shadow-md border border-gray-100">
-      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-        <span>Fusion+ Swap</span>
-        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">Gasless</span>
-      </h2>
-      
-      <div className="space-y-4">
-        {/* Chain selector */}
-        <div className="flex justify-between items-center gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Source Chain</label>
+    <div className="w-full max-w-md mx-auto bg-gray-900 shadow-lg rounded-2xl p-6 text-white">
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex space-x-4">
+            <button className="px-4 py-2 text-white font-medium rounded-lg bg-blue-600" title="Swap tokens">Swap</button>
+            <button className="px-4 py-2 text-gray-400 font-medium rounded-lg hover:bg-gray-800" title="Create limit order">Limit</button>
+          </div>
+          <div className="flex space-x-2">
+            <button 
+              className="p-2 rounded-full hover:bg-gray-800"
+              onClick={() => {
+                setQuoteData(null);
+                setCrossChainQuoteData(null);
+                // Trigger a re-fetch by slightly modifying the amount
+                if (amount) {
+                  const newAmount = parseFloat(amount) + 0.000001;
+                  setAmount(newAmount.toString());
+                }
+              }}
+              title="Refresh quote"
+            >
+              <RefreshCw className="h-5 w-5 text-gray-400" />
+            </button>
+            <button className="p-2 rounded-full hover:bg-gray-800" title="Settings">
+              <Settings className="h-5 w-5 text-gray-400" />
+            </button>
+          </div>
+        </div>
+        
+        <div className="flex items-center mb-4">
+          <label className="flex items-center cursor-pointer">
+            <div className="relative">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={isCrossChain}
+                onChange={(e) => {
+                  setIsCrossChain(e.target.checked);
+                  // Reset selections when toggling
+                  if (!e.target.checked) {
+                    setDestinationChainId(sourceChainId);
+                  }
+                  setToToken('');
+                  setSelectedToToken(null);
+                  setQuoteData(null);
+                  setCrossChainQuoteData(null);
+                }}
+              />
+              <div className={`w-10 h-6 ${isCrossChain ? 'bg-blue-600' : 'bg-gray-700'} rounded-full shadow-inner`}></div>
+              <div className={`absolute w-4 h-4 bg-white rounded-full shadow transition ${isCrossChain ? 'transform translate-x-5' : 'translate-x-1'} top-1`}></div>
+            </div>
+            <span className="ml-2 text-sm font-medium text-gray-300">Cross-Chain Swap</span>
+          </label>
+        </div>
+        
+        {/* Chain Selectors */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-400">Source Chain</label>
             <select 
-              className="w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-xl border border-gray-700 bg-gray-800 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-white"
               value={sourceChainId}
               onChange={(e) => {
                 setSourceChainId(Number(e.target.value));
@@ -233,29 +286,11 @@ export function FusionSwapForm() {
             </select>
           </div>
           
-          <div className="pt-6">
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input 
-                type="checkbox" 
-                value="" 
-                className="sr-only peer" 
-                checked={isCrossChain}
-                onChange={() => {
-                  setIsCrossChain(!isCrossChain);
-                  setQuoteData(null);
-                  setCrossChainQuoteData(null);
-                }}
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              <span className="ml-3 text-xs font-medium text-gray-600">Cross-Chain</span>
-            </label>
-          </div>
-          
-          {isCrossChain && (
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Destination Chain</label>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-400">Destination Chain</label>
+            <div className="relative">
               <select 
-                className="w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-xl border border-gray-700 bg-gray-800 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-white"
                 value={destinationChainId}
                 onChange={(e) => {
                   setDestinationChainId(Number(e.target.value));
@@ -271,335 +306,281 @@ export function FusionSwapForm() {
                   <option key={id} value={id}>{name}</option>
                 ))}
               </select>
+              {!isCrossChain && (
+                <div className="absolute inset-0 bg-gray-800 opacity-50 cursor-not-allowed rounded-xl"></div>
+              )}
             </div>
-          )}
+          </div>
         </div>
         
-        {/* From Token Selector */}
-        <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-          <div className="flex justify-between mb-1">
-            <label className="block text-sm font-medium text-gray-700">You Pay</label>
-            {selectedFromToken && (
-              <div className="text-sm text-gray-500">
-                Balance: --
-              </div>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <input 
-              className="w-full p-2 bg-transparent text-xl font-medium focus:outline-none"
-              placeholder="0.0" 
-              value={amount}
+        {/* Fee setting (only for cross-chain) */}
+        {isCrossChain && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1 text-gray-400">Fee (basis points - 1 bp = 0.01%)</label>
+            <input
               type="number"
               min="0"
-              step="0.01"
-              onChange={(e) => setAmount(e.target.value)}
+              max="1000"
+              className="w-full px-3 py-2 border border-gray-700 bg-gray-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-white"
+              value={fee}
+              onChange={(e) => setFee(e.target.value)}
+              placeholder="0"
             />
-            
-            <Button
-              type="button"
-              variant="outline"
-              className="flex items-center gap-2 h-10 px-3 rounded-lg bg-white"
-              onClick={() => setShowFromTokenSelector(!showFromTokenSelector)}
-            >
-              {selectedFromToken ? (
-                <>
-                  {selectedFromToken.logoURI && (
-                    <img 
-                      src={selectedFromToken.logoURI} 
-                      alt={selectedFromToken.symbol} 
-                      className="w-5 h-5 rounded-full"
-                    />
-                  )}
-                  <span>{selectedFromToken.symbol}</span>
-                </>
-              ) : (
-                <span>Select Token</span>
-              )}
-            </Button>
-          </div>
-        </div>
-        
-        {/* Swap Direction Button */}
-        <div className="flex justify-center -my-2 relative z-10">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="rounded-full w-10 h-10 p-0 border bg-white shadow-md"
-            onClick={handleSwitchTokens}
-            disabled={!selectedFromToken || !selectedToToken}
-          >
-            <ArrowDown size={16} />
-          </Button>
-        </div>
-        
-        {/* To Token Selector */}
-        <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-          <div className="flex justify-between mb-1">
-            <label className="block text-sm font-medium text-gray-700">You Receive</label>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <div className="w-full p-2 text-xl font-medium text-gray-500">
-              {quoteData?.toTokenAmount ? (
-                parseFloat(quoteData.toTokenAmount) / Math.pow(10, quoteData.toToken?.decimals || 18)
-              ) : crossChainQuoteData?.receiveAmount ? (
-                parseFloat(crossChainQuoteData.receiveAmount) / Math.pow(10, crossChainQuoteData.receiveToken?.decimals || 18)
-              ) : '0.0'}
-            </div>
-            
-            <Button
-              type="button"
-              variant="outline"
-              className="flex items-center gap-2 h-10 px-3 rounded-lg bg-white"
-              onClick={() => setShowToTokenSelector(!showToTokenSelector)}
-            >
-              {selectedToToken ? (
-                <>
-                  {selectedToToken.logoURI && (
-                    <img 
-                      src={selectedToToken.logoURI} 
-                      alt={selectedToToken.symbol} 
-                      className="w-5 h-5 rounded-full"
-                    />
-                  )}
-                  <span>{selectedToToken.symbol}</span>
-                </>
-              ) : (
-                <span>Select Token</span>
-              )}
-            </Button>
-          </div>
-        </div>
-        
-        {/* Display quote information */}
-        {(quoteData || crossChainQuoteData) && (
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm font-medium text-gray-700">Exchange Rate:</p>
-            
-            {quoteData && (
-              <div className="mt-1 text-lg font-semibold">
-                1 {selectedFromToken?.symbol} ≈ {parseFloat(quoteData.toTokenAmount) / parseFloat(quoteData.fromTokenAmount)} {selectedToToken?.symbol}
-              </div>
-            )}
-            
-            {crossChainQuoteData && (
-              <div className="space-y-2">
-                <div className="mt-1 text-lg font-semibold">
-                  1 {selectedFromToken?.symbol} ≈ {crossChainQuoteData.receiveAmount ? (parseFloat(crossChainQuoteData.receiveAmount) / parseFloat(amount)).toFixed(6) : '0'} {selectedToToken?.symbol}
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">You will receive:</span>
-                  <span className="font-medium">{crossChainQuoteData.receiveAmount ? (parseFloat(crossChainQuoteData.receiveAmount) / 10**18).toFixed(6) : '0'} {selectedToToken?.symbol}</span>
-                </div>
-                {crossChainQuoteData.fee && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Fee:</span>
-                    <span className="font-medium">{(parseFloat(crossChainQuoteData.fee) / 100).toFixed(2)}%</span>
-                  </div>
-                )}
-                {crossChainQuoteData.gasFee && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Gas Fee:</span>
-                    <span className="font-medium">{crossChainQuoteData.gasFee} {CHAIN_NAMES[sourceChainId.toString() as keyof typeof CHAIN_NAMES] || 'ETH'}</span>
-                  </div>
-                )}
-                {isCrossChain && (
-                  <div className="pt-1">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Custom Fee (bps, 100 = 1%)</label>
-                    <input
-                      type="number"
-                      className="w-full rounded-md border border-gray-300 py-1 px-2 text-sm"
-                      placeholder="0"
-                      value={fee}
-                      onChange={(e) => setFee(e.target.value)}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* Action Button */}
-        <Button 
-          onClick={handleSwap} 
-          disabled={isLoading || !fromToken || !toToken || !amount || !walletAddress}
-          className="w-full py-3 h-12"
-          variant="default"
-        >
-          {isLoading ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Creating Order...
-            </span>
-          ) : !walletAddress ? (
-            'Verify with World ID first'
-          ) : !fromToken || !toToken ? (
-            'Select Tokens'
-          ) : !amount ? (
-            'Enter Amount'
-          ) : (
-            'Create Swap Order'
-          )}
-        </Button>
-        
-        {/* Order Result */}
-        {result && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-100 rounded-lg">
-            <h3 className="font-medium text-green-800 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              Order Created Successfully
-            </h3>
-            <div className="mt-2 space-y-1 text-sm">
-              <div><strong>Order ID:</strong> <span className="font-mono">{result.id}</span></div>
-              <div><strong>Status:</strong> {result.status}</div>
-              <div><strong>Created:</strong> {new Date().toLocaleString()}</div>
-            </div>
-            <div className="mt-3 text-xs text-green-700">
-              Your order has been submitted and is being processed. You can check its status in the "Order Status" tab.
+            <div className="text-xs text-gray-400 mt-1">
+              Current fee: {parseInt(fee) / 100}%
             </div>
           </div>
         )}
       </div>
       
-      {/* Token Selection Modal - From */}
-      {showFromTokenSelector && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-4 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold">Select Token</h3>
-              <button 
-                onClick={() => setShowFromTokenSelector(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="relative mb-4">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
-              </div>
+      {/* From Token Selection - Now read-only since from token is always USDC */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-2 text-gray-400">You Pay</label>
+        <div className="bg-gray-800 rounded-xl p-4">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex-1">
               <input
                 type="text"
-                className="w-full pl-10 pr-4 py-2 border rounded-lg"
-                placeholder="Search by name or symbol..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent text-2xl font-semibold focus:outline-none"
+                value={amount}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numeric input with decimal point
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    setAmount(value);
+                  }
+                }}
+                placeholder="0.0"
               />
             </div>
             
-            <div className="overflow-y-auto flex-grow">
-              {isLoadingTokens ? (
-                <div className="flex justify-center items-center p-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                </div>
-              ) : filteredTokens.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No tokens found
+            <div 
+              className="flex items-center px-3 py-2 bg-gray-700 rounded-xl cursor-not-allowed"
+            >
+              {selectedFromToken ? (
+                <div className="flex items-center">
+                  {selectedFromToken.logoURI && (
+                    <img 
+                      src={selectedFromToken.logoURI} 
+                      alt={selectedFromToken.symbol} 
+                      className="w-6 h-6 mr-2 rounded-full"
+                    />
+                  )}
+                  <span className="font-medium">{selectedFromToken.symbol}</span>
                 </div>
               ) : (
-                <div className="grid gap-1">
-                  {filteredTokens.map((token) => (
-                    <button
-                      key={`from-${token.address}`}
-                      className="flex items-center gap-3 p-3 hover:bg-gray-100 rounded-lg text-left"
-                      onClick={() => handleSelectFromToken(token)}
-                    >
-                      {token.logoURI ? (
-                        <img 
-                          src={token.logoURI} 
-                          alt={token.symbol} 
-                          className="w-8 h-8 rounded-full"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                          <span className="text-xs font-medium">{token.symbol.substring(0, 2)}</span>
-                        </div>
-                      )}
-                      <div>
-                        <div className="font-medium">{token.symbol}</div>
-                        <div className="text-xs text-gray-500">{token.name}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                <span className="text-gray-400">Loading USDC...</span>
               )}
             </div>
           </div>
+          
+          {selectedFromToken && (
+            <div className="text-sm text-gray-400">
+              on {CHAIN_NAMES[sourceChainId.toString() as keyof typeof CHAIN_NAMES] || 'Unknown Chain'}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Swap Direction Button */}
+      <div className="flex justify-center -my-2 relative z-10">
+        <button
+          className="rounded-full w-10 h-10 p-0 bg-gray-800 border border-gray-700 shadow-md flex items-center justify-center"
+          disabled={true}
+          title="Switch tokens (disabled)"
+        >
+          <ArrowDown size={16} className="text-gray-400" />
+        </button>
+      </div>
+      
+      {/* To Token Selection */}
+      <div className="mb-6 mt-2">
+        <label className="block text-sm font-medium mb-2 text-gray-400">You Receive</label>
+        <div className="bg-gray-800 rounded-xl p-4">
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-2xl font-semibold text-gray-300">
+              {quoteData && selectedToToken
+                ? (parseFloat(quoteData.toTokenAmount) / 10 ** selectedToToken.decimals).toFixed(6)
+                : crossChainQuoteData 
+                  ? crossChainQuoteData.estimatedAmount
+                  : '0'
+              }
+            </div>
+            
+            <div 
+              className="flex items-center px-3 py-2 bg-gray-700 rounded-xl cursor-pointer"
+              onClick={() => setShowToTokenSelector(true)}
+            >
+              {selectedToToken ? (
+                <div className="flex items-center">
+                  {selectedToToken.logoURI && (
+                    <img 
+                      src={selectedToToken.logoURI} 
+                      alt={selectedToToken.symbol} 
+                      className="w-6 h-6 mr-2 rounded-full"
+                    />
+                  )}
+                  <span className="font-medium">{selectedToToken.symbol}</span>
+                </div>
+              ) : (
+                <span className="text-gray-400">Select a token</span>
+              )}
+            </div>
+          </div>
+          
+          {selectedToToken && (
+            <div className="text-sm text-gray-400">
+              on {CHAIN_NAMES[(isCrossChain ? destinationChainId : sourceChainId).toString() as keyof typeof CHAIN_NAMES] || 'Unknown Chain'}
+            </div>
+          )}
+        </div>
+        
+        {/* To Token Selector Modal */}
+        {showToTokenSelector && (
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+            <div className="bg-gray-900 rounded-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+                <h3 className="text-lg font-bold">Select Token</h3>
+                <button 
+                  className="text-gray-400 hover:text-white"
+                  onClick={() => setShowToTokenSelector(false)}
+                  title="Close token selector"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <div className="p-4">
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-3 h-5 w-5 text-gray-500" />
+                  <input
+                    type="text"
+                    className="w-full pl-10 pr-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-white"
+                    placeholder="Search by name or symbol"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                
+                {/* Common tokens */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {['USDC', 'ETH', 'WETH', 'DAI', 'USDT', 'WBTC'].map(symbol => (
+                    <button
+                      key={symbol}
+                      className="flex items-center justify-center bg-gray-800 hover:bg-gray-700 rounded-full p-2"
+                      onClick={() => {
+                        setSearchQuery(symbol);
+                      }}
+                    >
+                      <span className="text-sm font-medium px-2">{symbol}</span>
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="max-h-60 overflow-y-auto">
+                  {isLoadingTokens ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                    </div>
+                  ) : filteredTokens.length === 0 ? (
+                    <div className="py-8 text-center text-gray-500">
+                      No tokens found
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {filteredTokens.map((token) => (
+                        <div
+                          key={token.address}
+                          className="flex items-center p-3 hover:bg-gray-800 rounded-xl cursor-pointer"
+                          onClick={() => handleSelectToToken(token)}
+                        >
+                          {token.logoURI ? (
+                            <img
+                              src={token.logoURI}
+                              alt={token.symbol}
+                              className="w-8 h-8 mr-3 rounded-full"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center mr-3">
+                              <span className="text-xs">{token.symbol.substring(0, 2)}</span>
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-medium">{token.symbol}</div>
+                            <div className="text-xs text-gray-400">{token.name}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Quote Information */}
+      {(quoteData || crossChainQuoteData) && (
+        <div className="mb-6 p-3 bg-gray-800 rounded-xl text-sm">
+          <div className="flex justify-between mb-1">
+            <span className="text-gray-400">Exchange Rate:</span>
+            <span className="font-medium">
+              {quoteData && selectedFromToken && selectedToToken
+                ? `1 ${selectedFromToken.symbol} ≈ ${
+                    (parseFloat(quoteData.toTokenAmount) / 
+                    (parseFloat(quoteData.fromTokenAmount) / 10 ** selectedFromToken.decimals) / 
+                    10 ** selectedToToken.decimals).toFixed(6)
+                  } ${selectedToToken.symbol}`
+                : crossChainQuoteData 
+                  ? `1 ${selectedFromToken?.symbol || ''} ≈ ${crossChainQuoteData.rate || '-'} ${selectedToToken?.symbol || ''}`
+                  : '-'
+              }
+            </span>
+          </div>
+          
+          {crossChainQuoteData && (
+            <div className="flex justify-between mb-1">
+              <span className="text-gray-400">Fee:</span>
+              <span className="font-medium">{crossChainQuoteData.fee ? `${parseFloat(crossChainQuoteData.fee) / 100}%` : '-'}</span>
+            </div>
+          )}
         </div>
       )}
-      
-      {/* Token Selection Modal - To */}
-      {showToTokenSelector && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-4 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold">Select Token</h3>
-              <button 
-                onClick={() => setShowToTokenSelector(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="relative mb-4">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                className="w-full pl-10 pr-4 py-2 border rounded-lg"
-                placeholder="Search by name or symbol..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            
-            <div className="overflow-y-auto flex-grow">
-              {isLoadingTokens ? (
-                <div className="flex justify-center items-center p-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                </div>
-              ) : filteredTokens.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No tokens found
-                </div>
-              ) : (
-                <div className="grid gap-1">
-                  {filteredTokens.map((token) => (
-                    <button
-                      key={`to-${token.address}`}
-                      className="flex items-center gap-3 p-3 hover:bg-gray-100 rounded-lg text-left"
-                      onClick={() => handleSelectToToken(token)}
-                    >
-                      {token.logoURI ? (
-                        <img 
-                          src={token.logoURI} 
-                          alt={token.symbol} 
-                          className="w-8 h-8 rounded-full"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                          <span className="text-xs font-medium">{token.symbol.substring(0, 2)}</span>
-                        </div>
-                      )}
-                      <div>
-                        <div className="font-medium">{token.symbol}</div>
-                        <div className="text-xs text-gray-500">{token.name}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+  
+      {/* Swap Button */}
+      <button
+        className={`w-full py-3 px-4 rounded-xl text-white font-medium text-lg ${
+          isLoading || !selectedFromToken || !selectedToToken || !amount || parseFloat(amount) <= 0
+            ? 'bg-blue-800 opacity-50 cursor-not-allowed'
+            : 'bg-blue-600 hover:bg-blue-700'
+        }`}
+        disabled={isLoading || !selectedFromToken || !selectedToToken || !amount || parseFloat(amount) <= 0}
+        onClick={handleSwap}
+      >
+        {isLoading ? (
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin mr-2" />
+            Processing...
           </div>
+        ) : !selectedFromToken ? (
+          'Select source token'
+        ) : !selectedToToken ? (
+          'Select destination token'
+        ) : !amount || parseFloat(amount) <= 0 ? (
+          'Enter an amount'
+        ) : (
+          'Swap'
+        )}
+      </button>
+      
+      {/* Result */}
+      {result && (
+        <div className="mt-4 p-4 bg-green-900 bg-opacity-20 border border-green-700 rounded-xl">
+          <h3 className="font-medium text-green-400 mb-1 flex items-center">
+            <Check className="h-4 w-4 mr-1" /> Order Created!
+          </h3>
+          <p className="text-xs text-green-300 break-all">Order ID: {result.id}</p>
         </div>
       )}
     </div>
