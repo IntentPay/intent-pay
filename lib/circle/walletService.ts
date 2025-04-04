@@ -34,7 +34,7 @@ export class walletService {
       chain: arbitrumSepolia,
       transport: this.modularTransport as Transport,
     });
-    this.passkeyTransport = toPasskeyTransport(this.clientUrl, this.clientKey);
+    this.passkeyTransport = toPasskeyTransport(clientUrl, clientKey);
   }
 
   /**
