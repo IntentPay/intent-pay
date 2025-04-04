@@ -1,7 +1,7 @@
 'use client';
 
 import { MiniKit, VerifyCommandInput, VerificationLevel, ISuccessResult } from '@worldcoin/minikit-js'
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { useWorldID } from '@/lib/hooks/useWorldID';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,76 +13,129 @@ interface VerificationGateProps {
 }
 
 export function VerificationGate({ children }: VerificationGateProps) {
-  const { isVerified, isVerifying, verifyUser, error, isWorldApp } = useWorldID();
+  const { isVerified: worldIdVerified, isVerifying, verifyUser, error, isWorldApp } = useWorldID();
+  const [isVerified, setIsVerified] = useState(false);
   const [verificationInProgress, setVerificationInProgress] = useState(false);
   const { toast } = useToast();
 
+  // 检查本地存储的验证状态
+  useEffect(() => {
+    try {
+      const storedVerificationStatus = localStorage.getItem('worldid_verified');
+      if (storedVerificationStatus === 'true') {
+        setIsVerified(true);
+      }
+    } catch (error) {
+      console.error('Error reading verification status:', error);
+    }
+  }, []);
+
   const verifyPayload: VerifyCommandInput = {
-	action: 'intent', // This is your action ID from the Developer Portal
-	verification_level: VerificationLevel.Orb, // Orb | Device
-}
-
-const handleVerify = async () => {
-	if (!MiniKit.isInstalled()) {
-		return
+    action: 'intent', // This is your action ID from the Developer Portal
+    verification_level: VerificationLevel.Orb, // Orb | Device
   }
-  console.log('Verifying user with World ID');
-	// World App will open a drawer prompting the user to confirm the operation, promise is resolved once user confirms or cancels
-	const {finalPayload} = await MiniKit.commandsAsync.verify(verifyPayload)
-		if (finalPayload.status === 'error') {
-			return console.log('Error payload', finalPayload)
-		}
 
-		// Verify the proof in the backend
-		const verifyResponse = await fetch('/api/verify', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-			payload: finalPayload as ISuccessResult, // Parses only the fields we need to verify
-			action: 'intent',
-		}),
-	})
+  const handleVerify = async () => {
+    if (!MiniKit.isInstalled()) {
+      return
+    }
+    setVerificationInProgress(true);
+    console.log('Verifying user with World ID');
+    try {
+      // World App will open a drawer prompting the user to confirm the operation, promise is resolved once user confirms or cancels
+      const { finalPayload } = await MiniKit.commandsAsync.verify(verifyPayload)
+      if (finalPayload.status === 'error') {
+        console.log('Error payload', finalPayload);
+        setVerificationInProgress(false);
+        return;
+      }
 
-	// TODO: Handle Success!
-	const verifyResponseJson = await verifyResponse.json()
-	if (verifyResponseJson.status === 200) {
-    // Directly set verification status in localStorage to simulate verification
-    localStorage.setItem('worldid_verified', 'true');
-    
-    toast({
-      title: "Verification successful",
-      description: "Your identity has been verified with World ID",
-      variant: "default",
-      duration: 3000,
-    });
-    
-    // Force refresh to apply the verification status
-    window.location.reload();
-  } else {
-    toast({
-      title: "Verification failed",
-      description: "Your identity could not be verified with World ID",
-      variant: "destructive",
-      duration: 3000,
-    });
+      // Verify the proof in the backend
+      const verifyResponse = await fetch('/api/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          payload: finalPayload as ISuccessResult, // Parses only the fields we need to verify
+          action: 'intent',
+        }),
+      })
+
+      // Handle verification response
+      const verifyResponseJson = await verifyResponse.json()
+      if (verifyResponseJson.status === 200) {
+        // Store verification status
+        localStorage.setItem('worldid_verified', 'true');
+        setIsVerified(true);
+
+        // Store user data if available
+        try {
+          // Get user information from MiniKit
+          if (MiniKit.user) {
+            // Access properties safely using optional chaining and type assertion
+            // Since the exact User type from MiniKit might be different than expected
+            const userData = {
+              worldId: (MiniKit.user as any).nullifier || (MiniKit.user as any).id || Math.random().toString(36).substring(2, 15),
+              username: MiniKit.user.username || 'World ID User',
+              address: (MiniKit.user as any).wallets?.[0]?.address || ''
+            };
+
+            console.log('Saving World ID user data:', userData);
+            localStorage.setItem('worldid_user', JSON.stringify(userData));
+          } else {
+            console.warn('MiniKit.user is not available after verification');
+          }
+        } catch (userDataError) {
+          console.error('Error saving user data:', userDataError);
+        }
+
+        toast({
+          title: "Verification successful",
+          description: "Your identity has been verified with World ID",
+          variant: "default",
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "Verification failed",
+          description: "Your identity could not be verified with World ID",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error('Verification error:', error);
+      toast({
+        title: "Verification error",
+        description: "An unexpected error occurred during verification",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setVerificationInProgress(false);
+    }
   }
-}
 
   const handleTestVerify = () => {
     // Directly set verification status in localStorage to simulate verification
     localStorage.setItem('worldid_verified', 'true');
-    
+    setIsVerified(true);
+
+    // Set mock user data for testing
+    const mockUserData = {
+      worldId: 'world_id_' + Math.random().toString(36).substring(2, 10),
+      username: 'TestUser' + Math.floor(Math.random() * 1000),
+      address: '0x' + Array(40).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')
+    };
+    localStorage.setItem('worldid_user', JSON.stringify(mockUserData));
+
     toast({
       title: "Test verification enabled",
       description: "You've bypassed verification using test mode",
       variant: "default",
       duration: 3000,
     });
-    
-    // Force refresh to apply the verification status
-    window.location.reload();
   };
 
   if (isVerified) {
@@ -117,7 +170,7 @@ const handleVerify = async () => {
               <p className="text-sm mt-1">
                 This application requires World App to verify your identity. Please open this app in World App.
               </p>
-              <a 
+              <a
                 href="https://worldcoin.org/download"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -127,13 +180,13 @@ const handleVerify = async () => {
               </a>
             </div>
           )}
-          
+
           <div className="space-y-3">
             <Button 
               onClick={handleVerify} 
               className="w-full" 
               size="lg"
-              disabled={isVerifying || verificationInProgress}
+              disabled={isVerifying || verificationInProgress || !isWorldApp}
             >
               {isVerifying || verificationInProgress ? (
                 <>
@@ -147,13 +200,13 @@ const handleVerify = async () => {
                 </>
               )}
             </Button>
-            
+
             <div className="relative flex items-center">
               <div className="flex-grow border-t border-gray-300"></div>
               <span className="mx-4 flex-shrink text-xs text-gray-500">OR</span>
               <div className="flex-grow border-t border-gray-300"></div>
             </div>
-            
+
             <Button 
               onClick={handleTestVerify} 
               className="w-full" 

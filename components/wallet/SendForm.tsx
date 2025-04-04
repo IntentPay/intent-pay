@@ -3,23 +3,19 @@
 import { useState } from 'react';
 import { z } from 'zod';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { isValidEthereumAddress } from '@/lib/utils';
-import { Label } from '@/components/ui/label';
 
 // Form validation schema
 const sendFormSchema = z.object({
-  recipient: z.string().refine(isValidEthereumAddress, {
-    message: 'Please enter a valid Ethereum address',
+  recipient: z.string().refine(val => isValidEthereumAddress(val), {
+    message: "Invalid Ethereum address",
   }),
-  amount: z.string().refine(
-    (value) => {
-      const num = parseFloat(value);
-      return !isNaN(num) && num > 0;
-    },
-    { message: 'Please enter a valid amount greater than 0' }
-  ),
+  amount: z.string().refine(val => !isNaN(Number(val)) && Number(val) > 0, {
+    message: "Amount must be a positive number",
+  }),
 });
 
 type SendFormValues = z.infer<typeof sendFormSchema>;
