@@ -2,6 +2,7 @@ import './globals.css';
 
 import { Analytics } from '@vercel/analytics/react';
 import MiniKitProvider from '@/lib/minikit-provider';
+import { Toaster } from '@/components/ui/toast/toaster';
 
 export const metadata = {
   title: 'Next.js App Router + NextAuth + Tailwind CSS',
@@ -13,7 +14,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <MiniKitProvider>
-        <body className="flex min-h-screen w-full flex-col">{children}</body>
+        <body className="flex min-h-screen w-full flex-col">
+          {children}
+          <Toaster />
+        </body>
       </MiniKitProvider>
     </html>
   );

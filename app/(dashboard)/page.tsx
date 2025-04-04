@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { truncateAddress, formatCurrency } from '@/lib/utils';
 import { MiniKit } from '@worldcoin/minikit-js';
+import Link from 'next/link';
 
 // User information type
 interface WorldIDUser {
@@ -92,10 +93,12 @@ export default function WalletHomePage() {
           <ArrowUpRight className="h-4 w-4 mb-1" />
           <span className="text-xs">Send</span>
         </Button>
-        <Button variant="outline" className="flex flex-col h-16 items-center justify-center">
-          <ArrowDownUp className="h-4 w-4 mb-1" />
-          <span className="text-xs">Swap</span>
-        </Button>
+        <Link href="/swap" className="block col-span-1">
+          <Button variant="outline" className="flex flex-col h-16 w-full items-center justify-center">
+            <ArrowDownUp className="h-4 w-4 mb-1" />
+            <span className="text-xs">Swap</span>
+          </Button>
+        </Link>
       </div>
 
       {/* Transactions */}
