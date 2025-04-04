@@ -30,12 +30,11 @@ export function initializeWorldID(config: WorldIDConfig) {
   let miniKit: any = null;
   
   try {
-    // Initialize MiniKit
-    miniKit = new MiniKit({
-      app_id: config.appId,
-      action_id: config.actionId,
-      signal: config.signal || ''
-    });
+    // MiniKit no longer accepts configuration in the constructor
+    miniKit = new MiniKit();
+    
+    // Configuration is now done through properties
+    console.log('MiniKit initialized successfully');
   } catch (error) {
     console.error('Error initializing MiniKit:', error);
   }
@@ -54,8 +53,13 @@ export function initializeWorldID(config: WorldIDConfig) {
         // Implementation will use MiniKit to verify the user
         console.log('Verifying user with World ID');
         
-        // This would actually use the MiniKit to verify the user
-        // const result = await miniKit.verify();
+        // This would actually use the MiniKit to verify the user with the updated API
+        // Use the commandsAsync API instead as per the updated documentation
+        // const result = await miniKit.commandsAsync.verify({
+        //   action: config.actionId,
+        //   signal: config.signal || undefined,
+        //   verification_level: 'orb'
+        // });
         
         // Placeholder return value
         return {
@@ -79,8 +83,8 @@ export function initializeWorldID(config: WorldIDConfig) {
       // Check if running in a World App environment
       try {
         // This would use MiniKit to check if we're in a World App
-        // return miniKit.isWorldApp();
-        return true; // Placeholder
+        // Current API: MiniKit.isInstalled()
+        return MiniKit.isInstalled();
       } catch (error) {
         console.error('Error checking World App environment:', error);
         return false;

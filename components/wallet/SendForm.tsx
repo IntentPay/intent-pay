@@ -5,8 +5,8 @@ import { z } from 'zod';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { isValidEthereumAddress } from '@/lib/utils';
+import { Label } from '@/components/ui/label';
 
 // Form validation schema
 const sendFormSchema = z.object({
@@ -96,7 +96,7 @@ export function SendForm({ onSend, maxAmount = '0', onCancel }: SendFormProps) {
               placeholder="0x..."
               value={values.recipient || ''}
               onChange={(e) => handleChange('recipient', e.target.value)}
-              error={!!errors.recipient}
+              className={errors.recipient ? "border-red-500" : ""}
             />
             {errors.recipient && (
               <p className="text-sm text-red-500">{errors.recipient}</p>
@@ -116,10 +116,10 @@ export function SendForm({ onSend, maxAmount = '0', onCancel }: SendFormProps) {
               placeholder="0.00"
               step="0.01"
               min="0"
-              max={maxAmount}
+              max={maxAmount.toString()}
               value={values.amount || ''}
               onChange={(e) => handleChange('amount', e.target.value)}
-              error={!!errors.amount}
+              className={errors.amount ? "border-red-500" : ""}
             />
             {errors.amount && (
               <p className="text-sm text-red-500">{errors.amount}</p>
