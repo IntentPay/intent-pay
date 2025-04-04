@@ -1,12 +1,10 @@
 import './globals.css';
 
-import { Analytics } from '@vercel/analytics/react';
 import MiniKitProvider from '@/lib/minikit-provider';
 
 export const metadata = {
-  title: 'Next.js App Router + NextAuth + Tailwind CSS',
-  description:
-    'A user admin dashboard configured with Next.js, Postgres, NextAuth, Tailwind CSS, TypeScript, and Prettier.'
+  title: 'IntentPay',
+  description: 'IntentPay – Driven by Purpose, Powered by Simplicity.'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
