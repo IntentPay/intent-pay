@@ -5,7 +5,7 @@ import { ReactNode, useState, useEffect } from 'react';
 import { useWorldID } from '@/lib/hooks/useWorldID';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Shield, AlertTriangle, Check, Bug } from 'lucide-react';
+import { Loader2, Shield, AlertTriangle, Check, Bug, RotateCcw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 interface VerificationGateProps {
@@ -13,21 +13,108 @@ interface VerificationGateProps {
 }
 
 export function VerificationGate({ children }: VerificationGateProps) {
-  const { isVerified: worldIdVerified, isVerifying, verifyUser, error, isWorldApp } = useWorldID();
+  const { error } = useWorldID();
   const [isVerified, setIsVerified] = useState(false);
-  const [verificationInProgress, setVerificationInProgress] = useState(false);
+  const [isWorldApp, setIsWorldApp] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('No debug info yet');
+  const [userDebugInfo, setUserDebugInfo] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // 检查本地存储的验证状态
+  // Check World App environment and verification status - client-side only
   useEffect(() => {
-    try {
-      const storedVerificationStatus = localStorage.getItem('worldid_verified');
-      if (storedVerificationStatus === 'true') {
-        setIsVerified(true);
+    // Safely check if MiniKit is available
+    const checkMiniKit = () => {
+      try {
+        // Ensure client-side execution only
+        if (typeof window !== 'undefined') {
+          let debugMessage = '';
+          
+          // Check if MiniKit exists in window object
+          debugMessage += 'MiniKit exists: ' + ('MiniKit' in window) + '\n';
+          
+          if ('MiniKit' in window) {
+            debugMessage += 'MiniKit.isInstalled exists: ' + (typeof (window as any).MiniKit.isInstalled === 'function') + '\n';
+            
+            if (typeof (window as any).MiniKit.isInstalled === 'function') {
+              try {
+                const isInstalled = MiniKit.isInstalled();
+                debugMessage += 'MiniKit.isInstalled(): ' + isInstalled + '\n';
+                setIsWorldApp(isInstalled);
+              } catch (error: any) {
+                debugMessage += 'Error calling MiniKit.isInstalled(): ' + (error?.message || String(error)) + '\n';
+              }
+            }
+            
+            // Check if MiniKit.user exists
+            debugMessage += 'MiniKit.user exists: ' + ('user' in (window as any).MiniKit) + '\n';
+            if ('user' in (window as any).MiniKit) {
+              const userObj = (window as any).MiniKit.user;
+              debugMessage += 'MiniKit.user value: ' + JSON.stringify(userObj, null, 2) + '\n';
+              
+              // Check if user has wallet info
+              if (userObj && userObj.wallets && Array.isArray(userObj.wallets)) {
+                debugMessage += 'MiniKit.user.wallets exists: Yes (count: ' + userObj.wallets.length + ')\n';
+                userObj.wallets.forEach((wallet: any, index: number) => {
+                  debugMessage += `Wallet ${index}: ${JSON.stringify(wallet, null, 2)}\n`;
+                });
+              } else {
+                debugMessage += 'MiniKit.user.wallets exists: No\n';
+              }
+            }
+            
+            // Check walletAddress
+            debugMessage += 'MiniKit.walletAddress exists: ' + ('walletAddress' in (window as any).MiniKit) + '\n';
+            if ('walletAddress' in (window as any).MiniKit) {
+              debugMessage += 'MiniKit.walletAddress value: ' + ((window as any).MiniKit.walletAddress || 'null') + '\n';
+            }
+            
+            // Check getUserByAddress method
+            debugMessage += 'MiniKit.getUserByAddress exists: ' + ('getUserByAddress' in (window as any).MiniKit) + '\n';
+          }
+          
+          setDebugInfo(debugMessage);
+          
+          // Try detection via User-Agent
+          const userAgent = navigator.userAgent || '';
+          const isWorldAppUserAgent = userAgent.includes('WorldApp') || userAgent.includes('World App');
+          if (isWorldAppUserAgent) {
+            console.log('📱 Detected World App via User-Agent');
+            setIsWorldApp(true);
+          }
+        }
+      } catch (error: any) {
+        const errorMessage = '❌ Error checking MiniKit: ' + (error?.message || String(error));
+        console.error(errorMessage);
+        setDebugInfo(prev => prev + '\n' + errorMessage);
+        setIsWorldApp(false);
       }
-    } catch (error) {
-      console.error('Error reading verification status:', error);
-    }
+    };
+
+    // Check verification status in local storage
+    const checkVerificationStatus = () => {
+      try {
+        if (typeof window !== 'undefined') {
+          const storedVerificationStatus = localStorage.getItem('worldid_verified');
+          if (storedVerificationStatus === 'true') {
+            console.log('✅ User is already verified, allowing access');
+            setIsVerified(true);
+            
+            // Load and display any saved user debug info
+            const savedUserDebug = localStorage.getItem('worldid_user_debug');
+            if (savedUserDebug) {
+              setUserDebugInfo(savedUserDebug);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error reading verification status:', error);
+      }
+    };
+
+    // Run checks
+    checkMiniKit();
+    checkVerificationStatus();
   }, []);
 
   const verifyPayload: VerifyCommandInput = {
@@ -36,92 +123,217 @@ export function VerificationGate({ children }: VerificationGateProps) {
   }
 
   const handleVerify = async () => {
-    if (!MiniKit.isInstalled()) {
-      return
-    }
-    setVerificationInProgress(true);
-    console.log('Verifying user with World ID');
     try {
-      // World App will open a drawer prompting the user to confirm the operation, promise is resolved once user confirms or cancels
-      const { finalPayload } = await MiniKit.commandsAsync.verify(verifyPayload)
-      if (finalPayload.status === 'error') {
-        console.log('Error payload', finalPayload);
-        setVerificationInProgress(false);
-        return;
-      }
-
-      // Verify the proof in the backend
-      const verifyResponse = await fetch('/api/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          payload: finalPayload as ISuccessResult, // Parses only the fields we need to verify
-          action: 'intent',
-        }),
-      })
-
-      // Handle verification response
-      const verifyResponseJson = await verifyResponse.json()
-      if (verifyResponseJson.status === 200) {
-        // Store verification status
-        localStorage.setItem('worldid_verified', 'true');
-        setIsVerified(true);
-
-        // Store user data if available
-        try {
-          // Get user information from MiniKit
-          if (MiniKit.user) {
-            // Access properties safely using optional chaining and type assertion
-            // Since the exact User type from MiniKit might be different than expected
-            const userData = {
-              worldId: (MiniKit.user as any).nullifier || (MiniKit.user as any).id || Math.random().toString(36).substring(2, 15),
-              username: MiniKit.user.username || 'World ID User',
-              address: (MiniKit.user as any).wallets?.[0]?.address || ''
-            };
-
-            console.log('Saving World ID user data:', userData);
-            localStorage.setItem('worldid_user', JSON.stringify(userData));
-          } else {
-            console.warn('MiniKit.user is not available after verification');
-          }
-        } catch (userDataError) {
-          console.error('Error saving user data:', userDataError);
+      setIsVerifying(true);
+      console.log('🔐 Attempting to verify user ID');
+      
+      try {
+        // Try directly calling MiniKit.commandsAsync.verify
+        const { finalPayload } = await MiniKit.commandsAsync.verify(verifyPayload);
+        
+        if (finalPayload.status === 'error') {
+          console.log('❌ Error payload', finalPayload);
+          toast({
+            title: "Verification cancelled",
+            description: "World ID verification was cancelled or failed",
+            variant: "destructive",
+            duration: 3000,
+          });
+          return;
         }
 
-        toast({
-          title: "Verification successful",
-          description: "Your identity has been verified with World ID",
-          variant: "default",
-          duration: 3000,
+        // Verify the proof in the backend
+        const verifyResponse = await fetch('/api/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            payload: finalPayload as ISuccessResult,
+            action: 'intent',
+          }),
         });
-      } else {
+
+        // Handle verification response
+        const verifyResponseJson = await verifyResponse.json();
+        
+        if (verifyResponseJson.status === 200) {
+          console.log('✅ Verification successful');
+          // Store verification status
+          localStorage.setItem('worldid_verified', 'true');
+          
+          // Store user data if available
+          try {
+            // Get information about MiniKit properties
+            const miniKit = (window as any).MiniKit;
+            let userInfo = null;
+            let userByAddressInfo = null;
+            
+            // Try to get user data using getUserByAddress if available
+            if (miniKit.walletAddress && typeof miniKit.getUserByAddress === 'function') {
+              try {
+                console.log('🔍 Attempting to get user by address:', miniKit.walletAddress);
+                userByAddressInfo = await miniKit.getUserByAddress(miniKit.walletAddress);
+                console.log('✅ User data from getUserByAddress:', userByAddressInfo);
+              } catch (getUserError) {
+                console.error('❌ Error getting user by address:', getUserError);
+              }
+            }
+            
+            // Extract nullifier_hash from the verification payload
+            const nullifierHash = (finalPayload as any).nullifier_hash;
+            
+            // This will hold all discovered addresses for debugging
+            const discoveredAddresses: string[] = [];
+            if (miniKit.walletAddress) {
+              discoveredAddresses.push(`MiniKit.walletAddress: ${miniKit.walletAddress}`);
+            }
+            
+            if (miniKit.user && miniKit.user.wallets) {
+              miniKit.user.wallets.forEach((wallet: any, index: number) => {
+                if (wallet.address) {
+                  discoveredAddresses.push(`MiniKit.user.wallets[${index}].address: ${wallet.address}`);
+                }
+              });
+            }
+            
+            if (userByAddressInfo && userByAddressInfo.wallets) {
+              userByAddressInfo.wallets.forEach((wallet: any, index: number) => {
+                if (wallet.address) {
+                  discoveredAddresses.push(`userByAddressInfo.wallets[${index}].address: ${wallet.address}`);
+                }
+              });
+            }
+            
+            // Save detailed debug information about MiniKit
+            const userDebugData = `
+MiniKit.user available: ${miniKit.user ? 'Yes' : 'No'}
+MiniKit.user type: ${typeof miniKit.user}
+MiniKit.user content: ${JSON.stringify(miniKit.user || {}, null, 2)}
+MiniKit.walletAddress: ${miniKit.walletAddress || 'Not available'}
+MiniKit.getUserByAddress available: ${typeof miniKit.getUserByAddress === 'function' ? 'Yes' : 'No'}
+MiniKit.getUserByAddress result: ${JSON.stringify(userByAddressInfo || {}, null, 2)}
+MiniKit properties: ${Object.keys(miniKit || {}).join(', ')}
+All discovered addresses: ${discoveredAddresses.length > 0 ? '\n  - ' + discoveredAddresses.join('\n  - ') : 'None found'}
+Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
+`;
+            
+            setUserDebugInfo(userDebugData);
+            localStorage.setItem('worldid_user_debug', userDebugData);
+            
+            if (!nullifierHash) {
+              console.warn('⚠️ Could not find nullifier_hash in verification payload');
+            }
+            
+            // IMPORTANT: Use nullifier_hash as the primary identifier since it's the most reliable
+            const userData = {
+              // The nullifier_hash is the most reliable ID for World ID users
+              worldId: nullifierHash,
+              
+              // Try to get username from various sources
+              username: (userByAddressInfo && userByAddressInfo.username) || 
+                       (miniKit.user && miniKit.user.username) ||
+                       'World ID User',
+              
+              // Since we don't have a reliable wallet address, we'll use the nullifier_hash 
+              // as a fake address with 0x prefix to maintain compatibility
+              address: miniKit.walletAddress || 
+                      (miniKit.user && miniKit.user.wallets && miniKit.user.wallets[0]?.address) ||
+                      '0x' + nullifierHash.substring(2),
+              
+              // Save profile picture if available
+              profilePicture: (userByAddressInfo && userByAddressInfo.profilePicture) ||
+                             (miniKit.user && miniKit.user.profilePicture) ||
+                             '',
+                             
+              // Store the raw nullifier hash separately too
+              nullifierHash: nullifierHash
+            };
+
+            console.log('💾 Saving World ID user data:', userData);
+            localStorage.setItem('worldid_user', JSON.stringify(userData));
+            
+            // Show the nullifier hash in the UI toast for confirmation
+            toast({
+              title: "Verification successful",
+              description: (
+                <div>
+                  <p>Your identity has been verified with World ID</p>
+                  <p className="mt-2 text-xs font-mono break-all bg-slate-100 p-1 rounded">
+                    ID: {nullifierHash ? nullifierHash.substring(0, 10) + '...' : 'Not available'}
+                    {userData.username !== 'World ID User' ? 
+                      <><br />Username: {userData.username}</> : ''}
+                  </p>
+                </div>
+              ),
+              variant: "default",
+              duration: 5000,
+            });
+          } catch (userDataError) {
+            console.error('❌ Error saving user data:', userDataError);
+            
+            // Create fallback user data as last resort
+            const fallbackUserData = {
+              worldId: 'verified_' + Math.random().toString(36).substring(2, 10),
+              username: 'Verified User',
+              address: ''
+            };
+            localStorage.setItem('worldid_user', JSON.stringify(fallbackUserData));
+            
+            toast({
+              title: "Verification successful",
+              description: "Your identity has been verified with World ID",
+              variant: "default",
+              duration: 3000,
+            });
+          }
+          
+          // Update state to allow access
+          setIsVerified(true);
+        } else {
+          console.log('❌ Backend verification failed', verifyResponseJson);
+          toast({
+            title: "Verification failed",
+            description: "Your identity could not be verified with World ID",
+            variant: "destructive",
+            duration: 3000,
+          });
+        }
+      } catch (error: any) {
+        console.error('❌ Error calling MiniKit.verify:', error);
+        setDebugInfo(prev => prev + '\nError calling verify: ' + (error?.message || String(error)));
+        
         toast({
-          title: "Verification failed",
-          description: "Your identity could not be verified with World ID",
+          title: "Error",
+          description: "Error during verification, please use Test Mode",
           variant: "destructive",
           duration: 3000,
         });
       }
-    } catch (error) {
-      console.error('Verification error:', error);
+    } catch (error: any) {
+      console.error('❌ Verification error:', error);
+      setDebugInfo(prev => prev + '\nExternal error: ' + (error?.message || String(error)));
+      
       toast({
-        title: "Verification error",
+        title: "Verification process error",
         description: "An unexpected error occurred during verification",
         variant: "destructive",
         duration: 3000,
       });
     } finally {
-      setVerificationInProgress(false);
+      setIsVerifying(false);
     }
-  }
+  };
 
   const handleTestVerify = () => {
+    console.log('🧪 Using test mode to bypass verification');
+    
+    // Safe check - ensure client-side execution only
+    if (typeof window === 'undefined') return;
+    
     // Directly set verification status in localStorage to simulate verification
     localStorage.setItem('worldid_verified', 'true');
-    setIsVerified(true);
-
+    
     // Set mock user data for testing
     const mockUserData = {
       worldId: 'world_id_' + Math.random().toString(36).substring(2, 10),
@@ -136,12 +348,117 @@ export function VerificationGate({ children }: VerificationGateProps) {
       variant: "default",
       duration: 3000,
     });
+    
+    // Update state to allow access
+    setIsVerified(true);
   };
 
+  const forceWorldApp = () => {
+    setIsWorldApp(true);
+    toast({
+      title: "World App mode forced",
+      description: "Now you can try clicking the verification button",
+      variant: "default",
+      duration: 3000,
+    });
+  };
+
+  const refreshDetection = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        let debugMessage = 'Refresh detection results:\n';
+        
+        // Check if MiniKit exists in window object
+        debugMessage += 'MiniKit exists: ' + ('MiniKit' in window) + '\n';
+        
+        if ('MiniKit' in window) {
+          debugMessage += 'MiniKit.isInstalled exists: ' + (typeof (window as any).MiniKit.isInstalled === 'function') + '\n';
+          
+          if (typeof (window as any).MiniKit.isInstalled === 'function') {
+            try {
+              const isInstalled = MiniKit.isInstalled();
+              debugMessage += 'MiniKit.isInstalled(): ' + isInstalled + '\n';
+              setIsWorldApp(isInstalled);
+            } catch (error: any) {
+              debugMessage += 'Error calling MiniKit.isInstalled(): ' + (error?.message || String(error)) + '\n';
+            }
+          }
+          
+          // Also check walletAddress and getUserByAddress
+          const miniKit = (window as any).MiniKit;
+          debugMessage += 'MiniKit.walletAddress: ' + (miniKit.walletAddress || 'Not available') + '\n';
+          debugMessage += 'MiniKit.getUserByAddress available: ' + (typeof miniKit.getUserByAddress === 'function' ? 'Yes' : 'No') + '\n';
+        }
+        
+        // Try detection via User-Agent
+        const userAgent = navigator.userAgent || '';
+        debugMessage += 'User-Agent: ' + userAgent + '\n';
+        const isWorldAppUserAgent = userAgent.includes('WorldApp') || userAgent.includes('World App');
+        debugMessage += 'Detected World App via User-Agent: ' + isWorldAppUserAgent + '\n';
+        
+        if (isWorldAppUserAgent) {
+          console.log('📱 Detected World App via User-Agent');
+          setIsWorldApp(true);
+        }
+        
+        setDebugInfo(debugMessage);
+        
+        toast({
+          title: "Detection refreshed",
+          description: isWorldApp ? "World App environment detected" : "World App environment not detected",
+          variant: isWorldApp ? "default" : "destructive",
+          duration: 3000,
+        });
+      }
+    } catch (error: any) {
+      const errorMessage = '❌ Error refreshing detection: ' + (error?.message || String(error));
+      console.error(errorMessage);
+      setDebugInfo(errorMessage);
+      
+      toast({
+        title: "Refresh detection failed",
+        description: errorMessage,
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
+
+  // If user is verified, render children
   if (isVerified) {
-    return <>{children}</>;
+    return (
+      <>
+        {/* Render children, but first check if we have debug info to display */}
+        {userDebugInfo && (
+          <div className="fixed bottom-4 right-4 z-50">
+            <Button 
+              variant="outline" 
+              className="mb-2"
+              onClick={() => {
+                toast({
+                  title: "World ID Debug Info",
+                  description: (
+                    <div className="mt-2 max-h-[300px] overflow-auto">
+                      <pre className="text-xs whitespace-pre-wrap bg-slate-100 p-2 rounded">
+                        {userDebugInfo}
+                      </pre>
+                    </div>
+                  ),
+                  duration: 10000,
+                });
+              }}
+            >
+              <Bug className="h-4 w-4 mr-2" />
+              Show World ID Debug
+            </Button>
+          </div>
+        )}
+        {children}
+      </>
+    );
   }
 
+  // Otherwise show verification gate
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md shadow-lg">
@@ -168,16 +485,26 @@ export function VerificationGate({ children }: VerificationGateProps) {
             <div className="bg-amber-50 text-amber-700 p-4 rounded-md">
               <p className="font-medium">You're not using World App</p>
               <p className="text-sm mt-1">
-                This application requires World App to verify your identity. Please open this app in World App.
+                For real verification, please open this app in World App. You can use Test Mode below to bypass verification.
               </p>
-              <a
-                href="https://worldcoin.org/download"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center text-sm font-medium text-amber-800 hover:text-amber-900"
-              >
-                Download World App
-              </a>
+              <div className="mt-3 flex justify-between">
+                <a
+                  href="https://worldcoin.org/download"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-sm font-medium text-amber-800 hover:text-amber-900"
+                >
+                  Download World App
+                </a>
+                <Button 
+                  onClick={forceWorldApp} 
+                  variant="outline" 
+                  size="sm"
+                  className="text-xs border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                >
+                  Force Enable Verification
+                </Button>
+              </div>
             </div>
           )}
 
@@ -186,9 +513,9 @@ export function VerificationGate({ children }: VerificationGateProps) {
               onClick={handleVerify} 
               className="w-full" 
               size="lg"
-              disabled={isVerifying || verificationInProgress || !isWorldApp}
+              disabled={isVerifying}
             >
-              {isVerifying || verificationInProgress ? (
+              {isVerifying ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Verifying...
@@ -218,14 +545,32 @@ export function VerificationGate({ children }: VerificationGateProps) {
             </Button>
           </div>
 
-          {process.env.NODE_ENV === 'development' && !isWorldApp && (
+          <div className="bg-gray-50 border border-gray-200 rounded-md p-3 mt-4">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-sm font-medium text-gray-700">Debug Information</p>
+              <Button 
+                onClick={refreshDetection} 
+                variant="outline" 
+                size="sm"
+                className="h-7 px-2 text-xs"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Refresh Detection
+              </Button>
+            </div>
+            <pre className="text-xs bg-gray-100 p-2 rounded-md h-24 overflow-auto whitespace-pre-wrap">
+              {debugInfo}
+            </pre>
+          </div>
+
+          {process.env.NODE_ENV === 'development' && (
             <div className="bg-blue-50 text-blue-700 p-3 rounded-md mt-4">
               <p className="text-sm font-medium flex items-center">
                 <Check className="w-4 h-4 mr-2" />
-                Development mode
+                Development Mode
               </p>
               <p className="text-xs mt-1">
-                You can use either button to verify. The test mode button will bypass verification completely.
+                You can use Test Mode to bypass verification completely.
               </p>
             </div>
           )}
