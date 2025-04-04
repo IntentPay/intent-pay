@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowDownUp, ArrowUpRight, Plus, Wallet, User } from 'lucide-react';
+import { ArrowDownUp, ArrowUpRight, Plus, Wallet, User, Circle, Locate, CreditCard, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -20,7 +20,7 @@ export default function WalletHomePage() {
   // State management for user information
   const [user, setUser] = useState<WorldIDUser | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   // Mockup wallet data (for development)
   const walletAddress = user?.address || '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
   const usdcBalance = 1250.75;
@@ -30,7 +30,7 @@ export default function WalletHomePage() {
     { id: 3, type: 'swap', amount: 'ETH → USDC', date: '2025-04-01', value: '+230 USDC', status: 'completed' },
     { id: 4, type: 'send', amount: '-20 USDC', date: '2025-03-30', to: '0x9876...5432', status: 'pending' }
   ];
-  
+
   // Load user data from local storage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -39,7 +39,7 @@ export default function WalletHomePage() {
         if (userData) {
           setUser(JSON.parse(userData));
         }
-        
+
         // Also try to get the latest data from MiniKit
         if (MiniKit.isInstalled() && MiniKit.user) {
           console.log('MiniKit user:', MiniKit.user);
@@ -75,9 +75,7 @@ export default function WalletHomePage() {
 
         {/* Add World ID */}
         {user?.worldId && (
-          <div className="mt-2 text-xs opacity-70">
-            World ID: {truncateAddress(user.worldId, 6, 4)}
-          </div>
+          <div className="mt-2 text-xs opacity-70">World ID: {truncateAddress(user.worldId, 6, 4)}</div>
         )}
       </div>
 
@@ -113,7 +111,7 @@ export default function WalletHomePage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {transactions.map(tx => (
+                {transactions.map((tx) => (
                   <div key={tx.id} className="flex justify-between items-center border-b pb-2">
                     <div>
                       <div className="font-medium">{tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}</div>
@@ -128,7 +126,9 @@ export default function WalletHomePage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button variant="outline" className="w-full">View All Transactions</Button>
+              <Button variant="outline" className="w-full">
+                View All Transactions
+              </Button>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -147,6 +147,34 @@ export default function WalletHomePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Bottom Navigation Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t shadow-lg flex justify-around items-center h-16 z-50 rounded-t-xl">
+        <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+          <Home className="w-5 h-5" />
+          <span className="text-xs">Home</span>
+        </button>
+
+        <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+          <Wallet className="w-5 h-5" />
+          <span className="text-xs">Wallet</span>
+        </button>
+
+        {/* 中間 Logo 區塊 */}
+        <div className="bg-white w-12 h-12 rounded-full -mt-10 shadow-md flex items-center justify-center border">
+          <Circle className="w-6 h-6 text-indigo-600" /> {/* 可改成你的 logo */}
+        </div>
+
+        <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+          <Locate className="w-5 h-5" />
+          <span className="text-xs">Track</span>
+        </button>
+
+        <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+          <CreditCard className="w-5 h-5" />
+          <span className="text-xs">Card</span>
+        </button>
+      </nav>
     </div>
   );
 }
