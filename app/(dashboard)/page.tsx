@@ -1,30 +1,68 @@
 'use client';
 
-import { ArrowDownUp, ArrowUpRight, Circle, CreditCard, Home, Locate, Plus, Wallet } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowDownUp, ArrowUpRight, Plus, Wallet, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { truncateAddress, formatCurrency } from '@/lib/utils';
+import { MiniKit } from '@worldcoin/minikit-js';
 
-// Mockup wallet data
-const walletAddress = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
-const usdcBalance = 1250.75;
-const transactions = [
-  { id: 1, type: 'receive', amount: '+120 USDC', date: '2025-04-03', from: '0x1234...5678', status: 'completed' },
-  { id: 2, type: 'send', amount: '-45 USDC', date: '2025-04-02', to: '0xabcd...efgh', status: 'completed' },
-  { id: 3, type: 'swap', amount: 'ETH → USDC', date: '2025-04-01', value: '+230 USDC', status: 'completed' },
-  { id: 4, type: 'send', amount: '-20 USDC', date: '2025-03-30', to: '0x9876...5432', status: 'pending' }
-];
+// User information type
+interface WorldIDUser {
+  worldId: string;
+  username: string;
+  address: string;
+}
 
 export default function WalletHomePage() {
+  // State management for user information
+  const [user, setUser] = useState<WorldIDUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Mockup wallet data (for development)
+  const walletAddress = user?.address || '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
+  const usdcBalance = 1250.75;
+  const transactions = [
+    { id: 1, type: 'receive', amount: '+120 USDC', date: '2025-04-03', from: '0x1234...5678', status: 'completed' },
+    { id: 2, type: 'send', amount: '-45 USDC', date: '2025-04-02', to: '0xabcd...efgh', status: 'completed' },
+    { id: 3, type: 'swap', amount: 'ETH → USDC', date: '2025-04-01', value: '+230 USDC', status: 'completed' },
+    { id: 4, type: 'send', amount: '-20 USDC', date: '2025-03-30', to: '0x9876...5432', status: 'pending' }
+  ];
+  
+  // Load user data from local storage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const userData = localStorage.getItem('worldid_user');
+        if (userData) {
+          setUser(JSON.parse(userData));
+        }
+        
+        // Also try to get the latest data from MiniKit
+        if (MiniKit.isInstalled() && MiniKit.user) {
+          console.log('MiniKit user:', MiniKit.user);
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, []);
+
   return (
     <div className="flex flex-col w-full max-w-md mx-auto gap-4 pb-20">
       {/* Wallet Header */}
       <div className="flex flex-col items-center justify-center bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl p-6 shadow-lg">
         <h1 className="text-2xl font-bold">IntentPay</h1>
-        <div className="mt-1 mb-4">
-          <span className="text-sm opacity-80">Your gasless wallet for USDC transfers and intent trading</span>
-        </div>
+
+        {user && (
+          <div className="mt-1 mb-3 flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5">
+            <User className="h-4 w-4" />
+            <span className="text-sm font-medium">{user.username || 'World ID User'}</span>
+          </div>
+        )}
 
         {/* Wallet Balance */}
         <div className="text-3xl font-bold my-3">{formatCurrency(usdcBalance)}</div>
@@ -34,178 +72,78 @@ export default function WalletHomePage() {
           <span>{truncateAddress(walletAddress, 6, 4)}</span>
         </div>
 
-        {/* Quick Actions */}
-        <div className="flex items-center justify-between w-full mt-6">
-          <Button
-            variant="ghost"
-            className="flex flex-col items-center bg-white/10 hover:bg-white/20 text-white rounded-xl py-3 flex-1 mx-1"
-          >
-            <ArrowUpRight className="h-6 w-6 mb-1" />
-            <span className="text-xs">Send</span>
-          </Button>
-          <Button
-            variant="ghost"
-            className="flex flex-col items-center bg-white/10 hover:bg-white/20 text-white rounded-xl py-3 flex-1 mx-1"
-          >
-            <Plus className="h-6 w-6 mb-1" />
-            <span className="text-xs">Receive</span>
-          </Button>
-          <Button
-            variant="ghost"
-            className="flex flex-col items-center bg-white/10 hover:bg-white/20 text-white rounded-xl py-3 flex-1 mx-1"
-          >
-            <ArrowDownUp className="h-6 w-6 mb-1" />
-            <span className="text-xs">Swap</span>
-          </Button>
-        </div>
+        {/* Add World ID */}
+        {user?.worldId && (
+          <div className="mt-2 text-xs opacity-70">
+            World ID: {truncateAddress(user.worldId, 6, 4)}
+          </div>
+        )}
       </div>
 
-      {/* Activity Section */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Activity</CardTitle>
-          <CardDescription>Your recent transactions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="all" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="sent">Sent</TabsTrigger>
-              <TabsTrigger value="received">Received</TabsTrigger>
-            </TabsList>
-            <TabsContent value="all" className="mt-4">
+      {/* Action Buttons */}
+      <div className="grid grid-cols-3 gap-2">
+        <Button variant="outline" className="flex flex-col h-16 items-center justify-center">
+          <Plus className="h-4 w-4 mb-1" />
+          <span className="text-xs">Add USDC</span>
+        </Button>
+        <Button variant="outline" className="flex flex-col h-16 items-center justify-center">
+          <ArrowUpRight className="h-4 w-4 mb-1" />
+          <span className="text-xs">Send</span>
+        </Button>
+        <Button variant="outline" className="flex flex-col h-16 items-center justify-center">
+          <ArrowDownUp className="h-4 w-4 mb-1" />
+          <span className="text-xs">Swap</span>
+        </Button>
+      </div>
+
+      {/* Transactions */}
+      <Tabs defaultValue="activity" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="intents">Intents</TabsTrigger>
+        </TabsList>
+        <TabsContent value="activity">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Activity</CardTitle>
+              <CardDescription>Your recent transactions and activity</CardDescription>
+            </CardHeader>
+            <CardContent>
               <div className="space-y-4">
-                {transactions.map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          tx.type === 'receive'
-                            ? 'bg-green-100 text-green-600'
-                            : tx.type === 'send'
-                              ? 'bg-red-100 text-red-600'
-                              : 'bg-blue-100 text-blue-600'
-                        }`}
-                      >
-                        {tx.type === 'receive' ? (
-                          <Plus className="h-5 w-5" />
-                        ) : tx.type === 'send' ? (
-                          <ArrowUpRight className="h-5 w-5" />
-                        ) : (
-                          <ArrowDownUp className="h-5 w-5" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="font-medium capitalize">{tx.type}</div>
-                        <div className="text-xs text-gray-500">{tx.date}</div>
-                      </div>
+                {transactions.map(tx => (
+                  <div key={tx.id} className="flex justify-between items-center border-b pb-2">
+                    <div>
+                      <div className="font-medium">{tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}</div>
+                      <div className="text-sm text-gray-500">{tx.date}</div>
                     </div>
                     <div className="text-right">
-                      <div
-                        className={`font-medium ${
-                          tx.type === 'receive'
-                            ? 'text-green-600'
-                            : tx.type === 'send'
-                              ? 'text-red-600'
-                              : 'text-blue-600'
-                        }`}
-                      >
-                        {tx.amount}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {tx.status === 'pending' ? '⏳ Pending' : '✓ Completed'}
-                      </div>
+                      <div className={`font-medium ${tx.type === 'receive' ? 'text-green-600' : ''}`}>{tx.amount}</div>
+                      <div className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{tx.status}</div>
                     </div>
                   </div>
                 ))}
               </div>
-            </TabsContent>
-            <TabsContent value="sent" className="mt-4">
-              <div className="space-y-4">
-                {transactions
-                  .filter((tx) => tx.type === 'send')
-                  .map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between py-2 border-b border-gray-100">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
-                          <ArrowUpRight className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="font-medium">Send</div>
-                          <div className="text-xs text-gray-500">{tx.date}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-medium text-red-600">{tx.amount}</div>
-                        <div className="text-xs text-gray-500">
-                          {tx.status === 'pending' ? '⏳ Pending' : '✓ Completed'}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+            </CardContent>
+            <CardFooter>
+              <Button variant="outline" className="w-full">View All Transactions</Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        <TabsContent value="intents">
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Intents</CardTitle>
+              <CardDescription>Trading intents you've created</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center py-8">
+              <div className="text-center text-gray-500">
+                <p>You haven't created any intents yet</p>
+                <Button className="mt-4">Create Intent</Button>
               </div>
-            </TabsContent>
-            <TabsContent value="received" className="mt-4">
-              <div className="space-y-4">
-                {transactions
-                  .filter((tx) => tx.type === 'receive')
-                  .map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between py-2 border-b border-gray-100">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
-                          <Plus className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="font-medium">Receive</div>
-                          <div className="text-xs text-gray-500">{tx.date}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-medium text-green-600">{tx.amount}</div>
-                        <div className="text-xs text-gray-500">
-                          {tx.status === 'pending' ? '⏳ Pending' : '✓ Completed'}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-        <CardFooter className="pt-0">
-          <Button variant="outline" className="w-full">
-            View All Transactions
-          </Button>
-        </CardFooter>
-      </Card>
-
-      {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t shadow-lg flex justify-around items-center h-16 z-50 rounded-t-xl">
-        <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-          <Home className="w-5 h-5" />
-          <span className="text-xs">Home</span>
-        </button>
-
-        <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-          <Wallet className="w-5 h-5" />
-          <span className="text-xs">Wallet</span>
-        </button>
-
-        {/* 中間 Logo 區塊 */}
-        <div className="bg-white w-12 h-12 rounded-full -mt-10 shadow-md flex items-center justify-center border">
-          <Circle className="w-6 h-6 text-indigo-600" /> {/* 可改成你的 logo */}
-        </div>
-
-        <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-          <Locate className="w-5 h-5" />
-          <span className="text-xs">Track</span>
-        </button>
-
-        <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-          <CreditCard className="w-5 h-5" />
-          <span className="text-xs">Card</span>
-        </button>
-      </nav>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
