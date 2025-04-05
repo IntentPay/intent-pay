@@ -1,63 +1,107 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, ShoppingBag } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { CheckCircle2, Wallet } from 'lucide-react';
+import { MiniKit, PayCommandInput, Tokens, tokenToDecimals } from '@worldcoin/minikit-js';
 
 export default function PageA() {
-  const [isPaying, setIsPaying] = useState(false);
+  const [usdcAmount, setUsdcAmount] = useState(0);
+  const [wldAmount, setWldAmount] = useState(0);
+  const [isPaid, setIsPaid] = useState(false);
 
-  const handleApplePay = async () => {
-    setIsPaying(true);
-    try {
-      const payload = {
-        recipient: '0x1234567890abcdef...',
-        token: 'usdc',
-        amount: '1.00',
-        memo: 'Buy IntentPay Token',
-        paymentMethod: 'apple_pay'
-      };
+  useEffect(() => {
+    const conversionRate = 1; // 1 USDC = 1 USD
+    const calculatedWldAmount = usdcAmount * conversionRate;
+    setWldAmount(calculatedWldAmount);
+  }, [usdcAmount]);
 
-      // const result = await window.miniApp.sendCommand('onepay/quick-action', payload);
-      console.log('✅ Apple Pay Success:', true);
-    } catch (err) {
-      console.error('❌ Apple Pay Fail:', err);
-    } finally {
-      setIsPaying(false);
+  const sendPayment = async () => {
+    if (!MiniKit.isInstalled()) {
+      return;
+    }
+
+    const payload: PayCommandInput = {
+      reference: 'temp-id',
+      to: '0x67aad1351bb0665d2a560a52bef9ab8621567d25', // Test address
+      tokens: [
+        {
+          symbol: Tokens.WLD,
+          token_amount: tokenToDecimals(wldAmount, Tokens.WLD).toString()
+        }
+      ],
+      description: 'Pay for USDC purchase'
+    };
+
+    const { finalPayload } = await MiniKit.commandsAsync.pay(payload);
+
+    if (finalPayload.status == 'success') {
+      console.log('sendPayment successful!');
+      setIsPaid(true); // For Dev test
     }
   };
 
   return (
-    <Card className="max-w-md mx-auto p-6 shadow-2xl rounded-2xl bg-white/90 backdrop-blur">
-      <CardHeader className="text-center">
-        <div className="flex justify-center mb-2 text-indigo-600">
-          <ShoppingBag className="w-8 h-8" />
-        </div>
-        <CardTitle className="text-2xl font-bold">Buy IntentPay Token</CardTitle>
-        <CardDescription className="text-sm text-gray-600">Pay With Apple Pay</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col items-center space-y-6">
-        <img src="/assets/tokens/usdc.svg" alt="IntentPay Token" className="w-24 h-24 rounded-full shadow-lg" />
-        <div className="text-xl font-semibold text-gray-800">USDC$99</div>
+    <div className="flex justify-center items-start min-h-screen bg-muted px-2 sm:pt-20">
+      <Card className="w-full max-w-lg shadow-xl">
+        <CardHeader className="text-center">
+          <div className="flex justify-center mb-2">
+            <Wallet className="h-10 w-10 text-primary" />
+          </div>
+          <CardTitle className="text-2xl">Buy USDC</CardTitle>
+          <CardDescription>Use Apple Pay For Payment</CardDescription>
+        </CardHeader>
 
-        <Button
-          size="lg"
-          className="w-full bg-black text-white rounded-xl hover:bg-gray-800"
-          onClick={handleApplePay}
-          disabled={isPaying}
-        >
-          {isPaying ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              process ...
-            </>
-          ) : (
-            ' Use Apple Pay'
-          )}
-        </Button>
-      </CardContent>
-    </Card>
+        <form onSubmit={sendPayment}>
+          <CardContent className="space-y-4">
+            <div
+              className="rounded-xl p-5 text-white shadow-inner text-sm sm:text-base bg-cover bg-center"
+              style={{
+                backgroundImage: 'url("/assets/brushed-alum.png")',
+                backgroundColor: '#2b2b2b'
+              }}
+            >
+              <div className="opacity-90">VISA CARD</div>
+              <div className="text-xl font-semibold tracking-widest mt-3 opacity-95">**** **** **** 1688</div>
+              <div className="mt-4 text-xs sm:text-sm break-all opacity-80">Paying to: 0x67a...7d25</div>
+            </div>
+
+            {/* USDC Amount Input */}
+            <div className="flex items-center justify-between text-sm sm:text-base">
+              <span className="text-muted-foreground">Amount to Buy: (USDC)</span>
+              <input
+                type="number"
+                min="0"
+                step="0.001"
+                value={usdcAmount}
+                onChange={(e) => setUsdcAmount(parseFloat(e.target.value))}
+                className="text-center text-lg font-semibold w-20 p-2 border border-gray-300 rounded"
+              />
+            </div>
+
+            {/* Total WLD Calculation */}
+            <div className="flex items-center justify-between text-sm sm:text-base">
+              <span className="text-muted-foreground">Total Cost: </span>
+              <span className="font-semibold">{wldAmount.toFixed(4)} USD</span>
+            </div>
+          </CardContent>
+
+          <CardFooter className="mt-4">
+            {isPaid ? (
+              <div className="flex items-center gap-2 text-green-600">
+                <CheckCircle2 className="h-5 w-5" />
+                Payment successful!
+              </div>
+            ) : (
+              <Button type="submit" className="w-full bg-primary">
+                Buy USDC
+              </Button>
+            )}
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
   );
 }
