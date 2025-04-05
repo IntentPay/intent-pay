@@ -19,9 +19,10 @@ Intent Pay 允許已通過 World App 的 Orb 驗證的用戶直接交換代幣�
 
 ### 2. Intent Wallet - 您的個人 DeFi 門戶
 
-Intent Wallet 利用 World ID 驗證為需要更多功能的用戶創建個人非託管錢包：
+Intent Wallet 利用 World App 的錢包認證（Sign in with Ethereum）為需要更多功能的用戶創建個人非託管錢包：
 
-- **無縫創建**：World ID 的 nullifier_hash 作為您的 Circle 模組化錢包的唯一標識符
+- **無縫創建**：用戶的 World App 錢包地址作為其 Circle 模組化錢包的唯一標識符
+- **無密碼認證**：無需創建或記住新的憑證 - 只需通過 World App 進行認證
 - **完整功能**：轉賬、交換、接收資金和參與 DeFi 協議
 - **以 USDC 為中心**：通過轉賬或 World App 支付為您的錢包充值 USDC
 - **無燃料操作**：不需要為不同鏈持有特定的燃料代幣
@@ -33,20 +34,33 @@ Intent Wallet 提供傳統加密錢包的所有功能，同時顯著改善用戶
 ### World App 整合
 
 - **World ID 驗證**：防女巫驗證確保每個用戶都是獨特的人
+- **錢包認證整合**：使用以太坊登入（SIWE）協議進行安全認證
 - **MiniKit 整合**：與 World App 生態系統的無縫整合
 - **直接支付處理**：在熟悉的 World App 界面中處理 WLD 和 USDC.e 支付
 
 ### Circle 整合
 
 - **模組化錢包基礎設施**：為平台錢包（Intent Pay）和用戶錢包（Intent Wallet）提供動力
-- **Passkey 認證**：使用 World ID 驗證安全訪問錢包
+- **錢包地址認證**：使用用戶的 World App 錢包地址安全訪問錢包
 - **交易執行**：處理跨鏈操作，無需用戶管理燃料
+- **CCTP v2 應用**：跨鏈轉賬協議，用於安全地在不同區塊鏈之間移動 USDC
+- **Paymaster 整合**：使用 USDC 支付燃料費，在 Base 和 Arbitrum 網絡上實現無燃料代幣交易
 
 ### 1inch 整合
 
 - **Fusion 協議**：帶有 MEV 保護的無燃料交易
 - **跨鏈交換**：在多個區塊鏈網絡上執行交易
 - **深度流動性訪問**：通過聚合流動性源實現最佳價格執行
+
+### 跨鏈流動性管理
+
+- **多鏈儲備**：平台在以太坊、Base 和雪崩鏈上維護資金錢包
+- **動態路由選擇**：發起交換時，系統會查詢所有三條鏈，尋找最優費率
+- **Base 鏈優先**：由於 Paymaster 支持的限制，系統優先選擇 Base 鏈執行交易
+- **純 USDC 交易**：Circle Paymaster 使所有交換交易都可以使用 USDC 支付，無需持有任何燃料代幣
+- **最佳執行路徑**：在提供最低費用和最佳匯率的鏈上執行交易
+- **自動資金平衡**：智能再平衡系統維持所有鏈上的 USDC 儲備平衡
+- **安全資金移動**：利用 Circle 的 CCTP v2 進行快速、安全且成本效益高的跨鏈 USDC 轉移
 
 ## 用戶旅程
 
@@ -57,15 +71,17 @@ Intent Wallet 提供傳統加密錢包的所有功能，同時顯著改善用戶
 3. 輸入接收地址（手動或通過 QR 碼）
 4. 查看估算金額和費用
 5. 通過 World App 使用 WLD 或 USDC.e 支付
-6. 交換完成後收到確認
+6. 後台處理：系統識別最佳來源鏈（主要為支持 Paymaster 的 Base 鏈）
+7. 後台處理：從選定的鏈發起交換交易，燃料費通過 Circle Paymaster 使用 USDC 支付
+8. 交換完成後收到確認
 
 ### Intent Wallet 旅程
 
-1. 完成 World ID Orb 驗證
-2. 使用 nullifier_hash 自動創建錢包
+1. 通過 World App 完成錢包認證
+2. 使用用戶的 World App 錢包地址自動創建錢包
 3. 為錢包充值 USDC（通過轉賬或 World App）
 4. 使用錢包進行轉賬、交換和 DeFi 參與
-5. 管理所有資產，無需擔心燃料代幣
+5. 管理所有資產，無需擔心燃料代幣（燃料費通過 Circle Paymaster 使用 USDC 支付）
 
 ## IntentPay 願景
 
