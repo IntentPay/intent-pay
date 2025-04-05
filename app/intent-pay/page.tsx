@@ -417,21 +417,22 @@ function IntentPayContent() {
         
         // Initialize finalAmount in catch block as well
         let finalAmount = 0; // Or handle based on error
+        let receivedAmount = 0; // Reset receivedAmount
         
         // 使用简单估算作为API调用失败的后备方案
         if (isMounted) {
           const amountNum = parseFloat(amount);
-          let exchangeRate = 1; // Default rate
+          let exchangeRate = 1; // Default fallback rate
           
           // 如果是ETH，根据当前市场价格进行转换
           if (selectedToken.symbol === 'ETH') {
-            exchangeRate = 0.0003; // 1 USDC = 0.0003 ETH
-          } else if (selectedToken.symbol === 'WBTC') {
-            exchangeRate = 0.00002; // 1 USDC = 0.00002 WBTC
+            exchangeRate = 0.0003; // Example: 1 USDC = 0.0003 ETH
           }
-          
+          // Add other fallback rates if needed, e.g., for WBTC
+          // else if (selectedToken.symbol === 'WBTC') { ... }
+ 
           const fee = amountNum * 0.003; // 假设0.3%的费用
-          receivedAmount = amountNum * exchangeRate; // Estimate received before fee
+          receivedAmount = amountNum * exchangeRate; // Estimate receivedAmount in catch block
           finalAmount = receivedAmount - (fee * exchangeRate); // Assign to existing let
           if (finalAmount < 0) finalAmount = 0;
           
