@@ -1,7 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { Home, LineChart, Package, Package2, PanelLeft, Settings, ShoppingCart, Users2 } from 'lucide-react';
+import {
+  Circle,
+  CreditCard,
+  Home,
+  LineChart,
+  Locate,
+  Package,
+  Package2,
+  PanelLeft,
+  Settings,
+  ShoppingCart,
+  Users2,
+  Wallet
+} from 'lucide-react';
 import Link from 'next/link';
 
 import {
@@ -41,6 +54,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <main className="grid flex-1 items-start gap-2 p-4 sm:px-6 sm:py-0 md:gap-4 bg-muted/40">{children}</main>
             </div>
             <Toaster />
+            <MobileBottomNav />
           </main>
         </VerificationGate>
       </Providers>
@@ -201,5 +215,39 @@ function DashboardBrandHeader() {
         </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * Bottom Navigation Bar
+ */
+function MobileBottomNav() {
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 z-50 mx-auto flex h-16 max-w-md items-center justify-around rounded-t-xl border-t bg-white shadow-lg sm:hidden">
+      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+        <Home className="w-5 h-5" />
+        <span className="text-xs">Home</span>
+      </button>
+
+      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+        <Wallet className="w-5 h-5" />
+        <span className="text-xs">Wallet</span>
+      </button>
+
+      {/* 中間 Logo */}
+      <div className="flex h-12 w-12 -mt-10 items-center justify-center rounded-full border bg-white shadow-md">
+        <Circle className="h-6 w-6 text-indigo-600" />
+      </div>
+
+      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+        <Locate className="w-5 h-5" />
+        <span className="text-xs">Track</span>
+      </button>
+
+      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+        <CreditCard className="w-5 h-5" />
+        <span className="text-xs">Card</span>
+      </button>
+    </nav>
   );
 }

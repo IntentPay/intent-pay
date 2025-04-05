@@ -147,34 +147,6 @@ export default function WalletHomePage() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t shadow-lg flex justify-around items-center h-16 z-50 rounded-t-xl">
-        <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-          <Home className="w-5 h-5" />
-          <span className="text-xs">Home</span>
-        </button>
-
-        <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-          <Wallet className="w-5 h-5" />
-          <span className="text-xs">Wallet</span>
-        </button>
-
-        {/* 中間 Logo 區塊 */}
-        <div className="bg-white w-12 h-12 rounded-full -mt-10 shadow-md flex items-center justify-center border">
-          <Circle className="w-6 h-6 text-indigo-600" /> {/* 可改成你的 logo */}
-        </div>
-
-        <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-          <Locate className="w-5 h-5" />
-          <span className="text-xs">Track</span>
-        </button>
-
-        <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-          <CreditCard className="w-5 h-5" />
-          <span className="text-xs">Card</span>
-        </button>
-      </nav>
     </div>
   );
 }
