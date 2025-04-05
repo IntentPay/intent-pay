@@ -57,10 +57,10 @@ export function SendForm({ onSend, maxAmount = '0', onCancel }: SendFormProps) {
   // Initialize default chain
   useEffect(() => {
     const chainId = values.chainId;
-    if (chainId && CHAIN_NAMES[chainId]) {
+    if (chainId && CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES]) {
       setSelectedChain({
         id: chainId,
-        name: CHAIN_NAMES[chainId]
+        name: CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES]
       });
     }
   }, []);
@@ -132,10 +132,10 @@ export function SendForm({ onSend, maxAmount = '0', onCancel }: SendFormProps) {
   };
 
   const handleChainSelect = (chainId: string) => {
-    if (CHAIN_NAMES[chainId]) {
+    if (CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES]) {
       setSelectedChain({
         id: chainId,
-        name: CHAIN_NAMES[chainId]
+        name: CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES]
       });
       
       setValues((prev) => ({ ...prev, chainId }));
