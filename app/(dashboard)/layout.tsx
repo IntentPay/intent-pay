@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import { Home, LineChart, Package, Package2, PanelLeft, Settings, ShoppingCart, Users2 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -96,8 +99,14 @@ function DesktopNav() {
 }
 
 function MobileNav() {
+  const [openMobileNav, setOpenMobileNav] = useState(false);
+
+  const handleLinkClick = () => {
+    setOpenMobileNav(false);
+  };
+
   return (
-    <Sheet>
+    <Sheet open={openMobileNav} onOpenChange={setOpenMobileNav}>
       <SheetTrigger asChild>
         <Button size="icon" variant="outline" className="sm:hidden">
           <PanelLeft className="h-5 w-5" />
@@ -115,24 +124,37 @@ function MobileNav() {
           </Link>
           <Link
             href="/analytics"
+            onClick={handleLinkClick}
             className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
           >
             <Home className="h-5 w-5" />
             Dashboard
           </Link>
-          <Link href="/pageA" className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground">
+          <Link
+            href="/pageA"
+            onClick={handleLinkClick}
+            className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+          >
             <ShoppingCart className="h-5 w-5" />
             PageA
           </Link>
-          <Link href="/pageB" className="flex items-center gap-4 px-2.5 text-foreground">
+          <Link href="/pageB" onClick={handleLinkClick} className="flex items-center gap-4 px-2.5 text-foreground">
             <Package className="h-5 w-5" />
             World Payment
           </Link>
-          <Link href="/pageC" className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground">
+          <Link
+            href="/pageC"
+            onClick={handleLinkClick}
+            className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+          >
             <Users2 className="h-5 w-5" />
             PageC
           </Link>
-          <Link href="/" className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground">
+          <Link
+            href="/"
+            onClick={handleLinkClick}
+            className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+          >
             <LineChart className="h-5 w-5" />
             Settings
           </Link>
