@@ -65,7 +65,7 @@ function DesktopNav() {
           <ShoppingCart className="h-5 w-5" />
         </NavItem>
 
-        <NavItem href="/pageB" label="PageB">
+        <NavItem href="/pageB" label="World Payment">
           <Package className="h-5 w-5" />
         </NavItem>
 
@@ -126,7 +126,7 @@ function MobileNav() {
           </Link>
           <Link href="/pageB" className="flex items-center gap-4 px-2.5 text-foreground">
             <Package className="h-5 w-5" />
-            PageB
+            World Payment
           </Link>
           <Link href="/pageC" className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground">
             <Users2 className="h-5 w-5" />
