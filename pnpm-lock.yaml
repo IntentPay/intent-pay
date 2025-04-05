@@ -98,6 +98,9 @@ importers:
       next-auth:
         specifier: 5.0.0-beta.25
         version: 5.0.0-beta.25(next@15.1.3(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react@19.0.0)
+      permissionless:
+        specifier: ^0.2.39
+        version: 0.2.39(viem@2.25.0(typescript@5.7.2)(zod@3.24.1))
       postcss:
         specifier: ^8.4.49
         version: 8.4.49
@@ -1683,6 +1686,15 @@ packages:
   path-scurry@1.11.1:
     resolution: {integrity: sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA==}
     engines: {node: '>=16 || 14 >=14.18'}
+
+  permissionless@0.2.39:
+    resolution: {integrity: sha512-bw6Q41aj0dhwNhPfojzGk+7UTRIGgnzKbnGRlzwB2xI8SI2/yD7EE/IQWm/NbUWHE0yp9GaNOVcqB5mCBFTDNw==}
+    peerDependencies:
+      ox: 0.6.7
+      viem: ^2.23.2
+    peerDependenciesMeta:
+      ox:
+        optional: true
 
   pg-int8@1.0.1:
     resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}
@@ -3748,6 +3760,10 @@ snapshots:
     dependencies:
       lru-cache: 10.4.3
       minipass: 7.1.2
+
+  permissionless@0.2.39(viem@2.25.0(typescript@5.7.2)(zod@3.24.1)):
+    dependencies:
+      viem: 2.25.0(typescript@5.7.2)(zod@3.24.1)
 
   pg-int8@1.0.1: {}
 
