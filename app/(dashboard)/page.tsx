@@ -122,7 +122,6 @@ export default function WalletHomePage() {
     <div className="flex flex-col w-full max-w-md mx-auto gap-4 pb-20">
       {/* Wallet Header */}
       <div className="flex flex-col items-center justify-center bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl p-6 shadow-lg">
-        {/* 移除 IntentPay 標題 */}
 
         {user && (
           <div className="mt-1 mb-3 flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5">
