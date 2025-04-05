@@ -272,13 +272,11 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
               nullifierHash: nullifierHash
             };
 
-            // log
             const service = new walletService();
-            const hashWorldId = Buffer.from(userData.username, 'binary').toString('base64');
-            const credential = await service.getCredentialByWorldIdForRegistration(hashWorldId);
+            const credential = await service.getCredentialByWorldIdForRegistration(userData.username);
             const smartAccount = await service.initializeSmartAccount(credential);
+            userData.address = smartAccount.address;
             localStorage.setItem('worldid_smart_account', JSON.stringify(smartAccount));
-            
             
             console.log('💾 Saving World ID user data:', userData);
             localStorage.setItem('worldid_user', JSON.stringify(userData));
@@ -370,13 +368,13 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
       username: 'TestUser' + Math.floor(Math.random() * 1000),
       address: '0x' + Array(40).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')
     };
-    localStorage.setItem('worldid_user', JSON.stringify(mockUserData));
 
     // create smart account
     const service = new walletService();
-    const hashWorldId = Buffer.from(mockUserData.username, 'binary').toString('base64');
-    const credential = await service.getCredentialByWorldIdForRegistration(hashWorldId);
+    const credential = await service.getCredentialByWorldIdForRegistration(mockUserData.username);
     const smartAccount = await service.initializeSmartAccount(credential);
+    mockUserData.address = smartAccount.address;
+    localStorage.setItem('worldid_user', JSON.stringify(mockUserData));
     localStorage.setItem('worldid_smart_account', JSON.stringify(smartAccount));
 
     toast({
