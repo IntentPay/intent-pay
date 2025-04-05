@@ -6,28 +6,20 @@ import axios from 'axios';
 // Token interfaces based on the API response
 export interface TokenInfoDto {
   address: string;
-  chainId: number;
-  decimals: number;
-  extensions?: any;
-  logoURI: string;
-  name: string;
   symbol: string;
+  name: string;
+  decimals: number;
+  logoURI: string;
   tags: string[];
+  chainId?: number; // Make chainId optional to maintain compatibility
+}
+
+export interface ProtocolTokenDto {
+  tokens: Record<string, TokenInfoDto>;
 }
 
 export interface TokenListResponseDto {
-  keywords: string[];
-  logoURI: string;
-  name: string;
-  tags: Record<string, any>;
-  tags_order: string[];
-  timestamp: string;
   tokens: TokenInfoDto[];
-  version: {
-    major: number;
-    minor: number;
-    patch: number;
-  };
 }
 
 // Cached token data with timestamp
@@ -45,9 +37,76 @@ export const USDC_ADDRESSES: Record<number, string> = {
   10: '0x7F5c764cBc14f9669B88837ca1490cCa17c31607', // Optimism
   56: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', // Binance Smart Chain
   137: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174', // Polygon
+  8453: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // BASE
   42161: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', // Arbitrum One
   43114: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E', // Avalanche
   // 添加更多链的USDC地址
+};
+
+// Cache for API responses
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+
+const API_CACHE: Record<string, CacheEntry> = {};
+const CACHE_TTL = 60000; // 60 seconds cache lifetime
+const API_RATE_LIMIT = 1000; // 1 second between requests
+
+// Keep track of last API call timestamp
+let lastApiCallTimestamp = 0;
+
+// Function to wait for rate limit
+const waitForRateLimit = async () => {
+  const now = Date.now();
+  const timeElapsed = now - lastApiCallTimestamp;
+  
+  if (timeElapsed < API_RATE_LIMIT && lastApiCallTimestamp !== 0) {
+    const waitTime = API_RATE_LIMIT - timeElapsed;
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  
+  lastApiCallTimestamp = Date.now();
+};
+
+// The API key - in production this should be in an environment variable
+const API_KEY = "bU3wtFzdNutmkzsdlSuEtYgrvC6SUKiA";
+
+// Base API configuration
+const apiConfig = {
+  headers: {
+    'Authorization': `Bearer ${API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+};
+
+// Generic API request function with caching
+const fetchWithCache = async <T>(url: string, params: any = {}): Promise<T> => {
+  const cacheKey = `${url}:${JSON.stringify(params)}`;
+  
+  // Check if we have a valid cached response
+  if (API_CACHE[cacheKey] && (Date.now() - API_CACHE[cacheKey].timestamp) < CACHE_TTL) {
+    console.log('Using cached response for:', url);
+    return API_CACHE[cacheKey].data as T;
+  }
+  
+  // Wait for rate limit to be respected
+  await waitForRateLimit();
+  
+  try {
+    const response = await axios.get<T>(url, { ...apiConfig, params });
+    
+    // Cache the response
+    API_CACHE[cacheKey] = {
+      data: response.data,
+      timestamp: Date.now()
+    };
+    
+    return response.data;
+  } catch (error) {
+    console.error('API request failed:', error);
+    throw error;
+  }
 };
 
 /**
@@ -80,7 +139,11 @@ export async function searchTokensApi(
   limit: number = 10
 ): Promise<TokenInfoDto[]> {
   try {
-    const response = await axios.get('/api/1inch/token/search', {
+    interface SearchResponse {
+      data: TokenInfoDto[];
+    }
+    
+    const response = await fetchWithCache<SearchResponse>('/api/1inch/token/search', {
       params: {
         query,
         chainId,
@@ -88,24 +151,15 @@ export async function searchTokensApi(
       }
     });
     
-    return response.data || [];
+    return response.data;
   } catch (error) {
     console.error('Error searching tokens:', error);
     return [];
   }
 }
 
-// In-memory data cache
-let memoryCache: CachedTokenData | null = null;
-
-// Flag to prevent multiple concurrent API calls
-let isTokenListFetching = false;
-
-// Promise to track ongoing fetch operations
-let currentFetchPromise: Promise<TokenListResponseDto> | null = null;
-
 /**
- * Get all 1inch whitelisted tokens across multiple chains
+ * Fetch the full multi-chain token list from the 1inch API via our backend
  * Uses in-memory and localStorage caching to improve performance
  * Includes request deduplication to prevent API overloading
  */
@@ -141,23 +195,37 @@ export async function getMultiChainTokenList(): Promise<TokenListResponseDto> {
   try {
     // Create a new promise for this fetch operation
     currentFetchPromise = (async () => {
-      const response = await axios.get('/api/1inch/token-list');
-      const data = response.data;
+      // Use TokenListResponseDto here
+      const response = await fetchWithCache<TokenListResponseDto | TokenInfoDto[]>('/api/1inch/token-list');
       
-      // Validate the response data
-      if (!data || !data.tokens || !Array.isArray(data.tokens)) {
-        console.error('Invalid token list format received:', data);
-        throw new Error('Invalid token list data format');
+      // Log the raw response for debugging
+      console.log("Raw response from /api/1inch/token-list:", response);
+
+      // Determine where the token array is located
+      let tokensArray: TokenInfoDto[] | undefined;
+      if (Array.isArray(response)) {
+        // Case 1: The response itself is the array
+        tokensArray = response;
+      } else if (response && Array.isArray((response as TokenListResponseDto).tokens)) {
+        // Case 2: The response has a 'tokens' property which is the array
+        tokensArray = (response as TokenListResponseDto).tokens;
       }
       
-      // Store in both memory and localStorage
-      memoryCache = {
-        data,
-        timestamp: Date.now()
-      };
-      cacheTokenData(data);
+      // Validate the response data
+      if (tokensArray) {
+        const tokenListResponse = { tokens: tokensArray };
+        // Store in both memory and localStorage
+        memoryCache = {
+          data: tokenListResponse,
+          timestamp: Date.now()
+        };
+        cacheTokenData(tokenListResponse);
+        
+        return tokenListResponse;
+      }
       
-      return data;
+      console.error('Invalid token list format received:', response);
+      throw new Error('Invalid token list data format');
     })();
     
     // Wait for the fetch to complete and return results
@@ -183,6 +251,15 @@ export async function getMultiChainTokenList(): Promise<TokenListResponseDto> {
     currentFetchPromise = null;
   }
 }
+
+// In-memory data cache
+let memoryCache: CachedTokenData | null = null;
+
+// Flag to prevent multiple concurrent API calls
+let isTokenListFetching = false;
+
+// Promise to track ongoing fetch operations
+let currentFetchPromise: Promise<TokenListResponseDto> | null = null;
 
 /**
  * Get tokens filtered by a specific chain ID

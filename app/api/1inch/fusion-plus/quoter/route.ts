@@ -1,12 +1,56 @@
-import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
+import { NextRequest, NextResponse } from 'next/server';
 
 // API base URL
 const FUSION_PLUS_QUOTER_API_URL = 'https://api.1inch.dev/fusion-plus/quoter/v1.0';
 
+// 用于测试的固定响应数据，当useTestData=true时使用
+const TEST_RESPONSE = {
+  quoteId: "test-quote-id",
+  srcTokenAmount: "1000000000000000000",
+  dstTokenAmount: "299715033940591", // 约0.0003 ETH，1 USDC = 0.0003 ETH
+  presets: {
+    fast: {
+      auctionDuration: 180,
+      startAuctionIn: 20,
+      initialRateBump: 10000,
+      costInDstToken: "5000000000000"
+    },
+    medium: {
+      auctionDuration: 360,
+      startAuctionIn: 20,
+      initialRateBump: 10000,
+      costInDstToken: "5000000000000"
+    },
+    slow: {
+      auctionDuration: 600,
+      startAuctionIn: 20,
+      initialRateBump: 10000,
+      costInDstToken: "5000000000000"
+    }
+  },
+  recommendedPreset: "fast",
+  prices: {
+    usd: {
+      srcToken: "1.0",
+      dstToken: "3333.33"
+    }
+  },
+  srcChain: "1",
+  dstChain: "56",
+  srcTokenAddress: "0x1111111111111111111111111111111111111111",
+  dstTokenAddress: "0x2222222222222222222222222222222222222222",
+  amount: "1000000000000000000",
+  walletAddress: "0x3333333333333333333333333333333333333333",
+  enableEstimate: "true",
+  fee: "0",
+  isPermit2: "false",
+  permit: ""
+};
+
 export async function GET(request: NextRequest) {
   try {
-    const apiKey = process.env.ONEINCH_API_KEY;
+    const apiKey = process.env.ONEINCH_API_KEY || 'bU3wtFzdNutmkzsdlSuEtYgrvC6SUKiA';
     
     if (!apiKey) {
       return NextResponse.json(
@@ -27,6 +71,21 @@ export async function GET(request: NextRequest) {
     const fee = searchParams.get('fee');
     const isPermit2 = searchParams.get('isPermit2');
     const permit = searchParams.get('permit');
+    
+    // 新增：是否使用测试数据而不是实际调用API
+    const useTestData = searchParams.get('useTestData') === 'true';
+    
+    // 打印所有参数，以便于调试
+    console.log("Quote API Request Params:", {
+      srcChain, dstChain, srcTokenAddress, dstTokenAddress, 
+      amount, walletAddress, enableEstimate, fee, isPermit2, permit
+    });
+    
+    // 如果启用了测试模式，直接返回测试数据
+    if (useTestData) {
+      console.log("Using test data instead of calling 1inch API");
+      return NextResponse.json(TEST_RESPONSE);
+    }
     
     // Check for required parameters
     if (!srcChain || !dstChain || !srcTokenAddress || !dstTokenAddress || !amount || !walletAddress) {
@@ -54,20 +113,37 @@ export async function GET(request: NextRequest) {
     
     // Make request to 1inch API
     const url = `${FUSION_PLUS_QUOTER_API_URL}/quote/receive`;
-    const response = await axios.get(url, {
-      params,
-      headers: { 'Authorization': `Bearer ${apiKey}` }
-    });
+    console.log("Calling 1inch API:", url, params);
     
-    return NextResponse.json(response.data);
+    try {
+      const response = await axios.get(url, {
+        params,
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      
+      return NextResponse.json(response.data);
+    } catch (error: any) {
+      console.error('Error fetching cross-chain quote:', error);
+      console.error('Error response data:', error.response?.data);
+      
+      return NextResponse.json(
+        { 
+          error: error.message || 'Failed to fetch cross-chain quote',
+          details: error.response?.data,
+          requestInfo: {
+            url,
+            params,
+            headers: { Authorization: 'Bearer ***' } // 隐藏实际的API key
+          }
+        },
+        { status: error.response?.status || 500 }
+      );
+    }
   } catch (error: any) {
-    console.error('Error fetching cross-chain quote:', error);
+    console.error('Unexpected error in quoter API:', error);
     return NextResponse.json(
-      { 
-        error: error.message || 'Failed to fetch cross-chain quote',
-        details: error.response?.data
-      },
-      { status: error.response?.status || 500 }
+      { error: 'Unexpected error in API handler', message: error.message },
+      { status: 500 }
     );
   }
 }

@@ -40,7 +40,7 @@ import ApplePayButton from '@/components/applePay/ApplePay';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { getMultiChainTokenList, getTokensByChain, TokenInfoDto, getUsdcTokenInfo } from '@/lib/1inch/token';
+import { getMultiChainTokenList, getTokensByChain, TokenInfoDto, getUsdcTokenInfo, USDC_ADDRESSES } from '@/lib/1inch/token';
 import { useToast } from '@/components/ui/use-toast';
 import { QRScannerModal } from '@/components/qr/QRScanner';
 import { MiniKit, tokenToDecimals, Tokens, PayCommandInput } from '@worldcoin/minikit-js';
@@ -56,6 +56,12 @@ const sendHapticHeavyCommand = () =>
 
 // Default slippage
 const DEFAULT_SLIPPAGE = 0.5;
+
+// Format address function to truncate long addresses
+const formatAddress = (address: string) => {
+  if (!address || address.length < 10) return address;
+  return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+};
 
 // Component wrapping useSearchParams
 function IntentPayContent() {
@@ -73,6 +79,17 @@ function IntentPayContent() {
   const [showTokenSelector, setShowTokenSelector] = useState(false);
   const [estimatedReceived, setEstimatedReceived] = useState('0');
   const [fee, setFee] = useState('0');
+  const [quoteData, setQuoteData] = useState<QuoteOutput | null>(null);
+  const [selectedToken, setSelectedToken] = useState<TokenInfoDto | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+  const [tokenSearchQuery, setTokenSearchQuery] = useState('');
+  const [tokenSearch, setTokenSearch] = useState<{
+    loading: boolean;
+    results: TokenInfoDto[];
+  }>({ loading: false, results: [] });
+  const [allTokens, setAllTokens] = useState<TokenInfoDto[]>([]);
+  const [hasLoadedAllTokens, setHasLoadedAllTokens] = useState(false);
+  const [isLoadingTokens, setIsLoadingTokens] = useState(false); // Keep loading state
   const [showSlippageSettings, setShowSlippageSettings] = useState(false);
   const [showChainSelector, setShowChainSelector] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -80,29 +97,86 @@ function IntentPayContent() {
   const [isValidAddress, setIsValidAddress] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [isQuoteLoading, setIsQuoteLoading] = useState(false);
-  const [quoteData, setQuoteData] = useState<QuoteOutput | null>(null);
-  const [destinationChainId, setDestinationChainId] = useState<number>(137); // Default to Polygon
-  
-  // Token states
-  const [availableTokens, setAvailableTokens] = useState<TokenInfoDto[]>([]);
-  const [filteredTokens, setFilteredTokens] = useState<TokenInfoDto[]>([]);
-  const [selectedToken, setSelectedToken] = useState<TokenInfoDto | null>(null);
-  const [isLoadingTokens, setIsLoadingTokens] = useState(false);
-  const [tokenSearchQuery, setTokenSearchQuery] = useState<string>('');
-  const [tokenSearch, setTokenSearch] = useState<{
-    loading: boolean;
-    results: TokenInfoDto[];
-  }>({ loading: false, results: [] });
+  const [destinationChainId, setDestinationChainId] = useState<number>(8453); // Default to Base
   
   // Chain states
-  const [availableChains, setAvailableChains] = useState<number[]>([8453, 137]);
+  const [availableChains, setAvailableChains] = useState<number[]>([1, 56, 137, 42161, 100, 10, 8453, 43114, 324, 59144]);
   const [showDestinationChainSelector, setShowDestinationChainSelector] = useState(false);
   
+  // Hardcoded chain information
+  const CHAIN_INFO = [
+    {
+      id: 1,
+      name: "Ethereum",
+      icon: "https://app.1inch.io/assets/images/network-logos/ethereum.svg"
+    },
+    {
+      id: 56,
+      name: "BNB Chain",
+      icon: "https://app.1inch.io/assets/images/network-logos/bsc_2.svg"
+    },
+    {
+      id: 137,
+      name: "Polygon",
+      icon: "https://app.1inch.io/assets/images/network-logos/polygon_1.svg"
+    },
+    {
+      id: 42161,
+      name: "Arbitrum",
+      icon: "https://app.1inch.io/assets/images/network-logos/arbitrum_2.svg"
+    },
+    {
+      id: 100,
+      name: "Gnosis",
+      icon: "https://app.1inch.io/assets/images/network-logos/gnosis.svg"
+    },
+    {
+      id: 10,
+      name: "Optimism",
+      icon: "https://app.1inch.io/assets/images/network-logos/optimism.svg"
+    },
+    {
+      id: 8453,
+      name: "Base",
+      icon: "https://app.1inch.io/assets/images/network-logos/base.svg"
+    },
+    {
+      id: 43114,
+      name: "Avalanche",
+      icon: "https://app.1inch.io/assets/images/network-logos/avalanche.svg"
+    },
+    {
+      id: 324,
+      name: "zkSync Era",
+      icon: "https://app.1inch.io/assets/images/network-logos/zksync-era.svg"
+    },
+    {
+      id: 59144,
+      name: "Linea",
+      icon: "https://app.1inch.io/assets/images/network-logos/linea.svg"
+    }
+  ];
+
+  // 完整的链名称映射
+  const CHAIN_NAMES: Record<string, string> = {
+    "1": "Ethereum",
+    "56": "BNB Chain",
+    "137": "Polygon",
+    "42161": "Arbitrum",
+    "100": "Gnosis",
+    "10": "Optimism",
+    "8453": "Base", 
+    "43114": "Avalanche",
+    "324": "zkSync Era",
+    "59144": "Linea"
+  };
+
   // Get current chain name
   const chainName = selectedChainId ? CHAIN_NAMES[selectedChainId.toString() as keyof typeof CHAIN_NAMES] : '';
   
   // Load USDC token info using 1inch API
   useEffect(() => {
+    setIsMounted(true);
     async function loadUsdcTokenInfo() {
       try {
         const usdcInfo = await getUsdcTokenInfo(selectedChainId);
@@ -117,134 +191,252 @@ function IntentPayContent() {
     loadUsdcTokenInfo();
   }, [selectedChainId]);
   
-  // Load tokens when chain changes
+  // Effect to update token list when selector opens or chain changes
   useEffect(() => {
-    let isMounted = true;
-    
-    const loadTokens = async () => {
+    const loadAndFilterTokens = async () => {
       setIsLoadingTokens(true);
-      setTokenSearch({ loading: true, results: [] });
-      
-      try {
-        const chainId = selectedChainId;
-        
-        if (tokenSearchQuery.trim()) {
-          // Use search API
-          const results = await searchTokensApi(tokenSearchQuery, chainId, 20);
-          if (isMounted) {
-            setTokenSearch({ loading: false, results: results });
-          }
-        } else {
-          // Get all tokens for this chain
-          const allTokens = await getTokensByChain(chainId);
-          if (isMounted) {
-            setAvailableTokens(allTokens);
-            setFilteredTokens(allTokens);
-            setTokenSearch({ loading: false, results: allTokens });
-          }
-        }
-      } catch (error) {
-        console.error('Error loading tokens:', error);
-        if (isMounted) {
-          setTokenSearch({ loading: false, results: [] });
-        }
-      } finally {
-        if (isMounted) {
+      let currentTokens = allTokens;
+
+      // Fetch full list only if not already loaded
+      if (!hasLoadedAllTokens) {
+        try {
+          const tokenListResponse = await getMultiChainTokenList();
+          currentTokens = tokenListResponse.tokens;
+          setAllTokens(currentTokens);
+          setHasLoadedAllTokens(true);
+        } catch (error) {
+          console.error("Error fetching initial token list:", error);
+          setTokenSearch({ loading: false, results: [] }); 
           setIsLoadingTokens(false);
+          return; // Exit if initial fetch fails
         }
       }
+      
+      // Filter the (potentially newly fetched) list for the selected chain
+      const filteredTokens = getTokensByChain(selectedChainId, { tokens: currentTokens });
+      setTokenSearch({ loading: false, results: filteredTokens });
+      setIsLoadingTokens(false);
     };
-    
-    loadTokens();
-    
-    // Set default token (USDC) for the selected chain
-    const setDefaultToken = async () => {
-      try {
-        const usdcToken = await getUsdcTokenInfo(selectedChainId);
-        if (usdcToken) {
-          setSelectedToken(usdcToken);
-        }
-      } catch (error) {
-        console.error('Error setting default token:', error);
-      }
-    };
-    
-    setDefaultToken();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedChainId, tokenSearchQuery]);
-  
-  // Handle token search
+
+    if (showTokenSelector) {
+      loadAndFilterTokens();
+      setTokenSearchQuery(''); // Clear search query when opening
+    }
+  }, [showTokenSelector, selectedChainId, hasLoadedAllTokens, allTokens]); // Add dependencies
+
+  // 处理Token搜索
   const handleTokenSearch = async (query: string) => {
-    setTokenSearch({ loading: true, results: [] });
+    setTokenSearchQuery(query);
     
-    try {
-      if (query.trim()) {
+    if (query.trim() === '') {
+      // If search is empty, filter the locally stored allTokens list
+      setIsLoadingTokens(false); // No API call needed here
+      const filteredTokens = getTokensByChain(selectedChainId, { tokens: allTokens });
+      setTokenSearch({ loading: false, results: filteredTokens });
+    } else {
+      // Otherwise, use the search API
+      setIsLoadingTokens(true);
+      setTokenSearch({ loading: true, results: [] }); // Show loading
+      try {
         const results = await searchTokensApi(query, selectedChainId, 20);
         setTokenSearch({ loading: false, results: results });
-      } else {
-        // If no query, show all available tokens for this chain
-        const allTokens = await getTokensByChain(selectedChainId);
-        setTokenSearch({ loading: false, results: allTokens });
+      } catch (error) {
+        console.error('Error searching tokens:', error);
+        setTokenSearch({ loading: false, results: [] });
+      } finally {
+        setIsLoadingTokens(false);
       }
-    } catch (error) {
-      console.error('Error searching tokens:', error);
-      setTokenSearch({ loading: false, results: [] });
     }
   };
-  
+
   // Calculate estimated receipt amount via 1inch API
   useEffect(() => {
     let isMounted = true;
     
-    const fetchQuote = async () => {
+    const fetchTokenQuote = async () => {
       if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0 || !selectedToken) {
         setFee('0');
         setEstimatedReceived('0');
-        setQuoteData(null);
         return;
       }
       
       setIsQuoteLoading(true);
       
       try {
-        // Convert amount to token units
-        const amountInUnits = convertToTokenUnits(amount, selectedToken.decimals);
+        // 确保金额转换为代币单位
+        const tokenAmount = parseFloat(amount);
+        // 我们仍然保留这个作为备用方案
+        let exchangeRate = 1; // 默认1:1兑换率
         
-        // Use a default wallet address for quoting purposes
-        const defaultWalletAddress = '0x0000000000000000000000000000000000000000';
+        // 如果是ETH，根据当前市场价格进行转换 (假设ETH比USDC价值更高)
+        if (selectedToken.symbol === 'ETH') {
+          // 这里应该接入实际的价格API，但现在我们使用一个合理的预设值
+          exchangeRate = 0.0003; // 假设1 USDC = 0.0003 ETH (或1 ETH = 约3333 USDC)
+        } else if (selectedToken.symbol === 'WBTC') {
+          exchangeRate = 0.00002; // 假设1 USDC = 0.00002 WBTC
+        }
         
-        // Get the quote
+        // 获取USDC地址和目标代币地址
+        const getTokenAddress = (chainId: number, symbol: string) => {
+          // ETH 和 MATIC 的特殊地址
+          if (symbol === 'ETH' || symbol === 'MATIC') {
+            return '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+          }
+          
+          // 为USDC使用预定义的地址
+          if (symbol === 'USDC') {
+            const usdcAddress = USDC_ADDRESSES[chainId];
+            if (usdcAddress) return usdcAddress;
+          }
+          
+          // 默认返回所选代币的地址
+          return selectedToken.address;
+        };
+        
+        // 对于跨链交易，我们需要正确的源代币和目标代币
+        const srcTokenAddress = getTokenAddress(selectedChainId, 'USDC'); // 源代币是USDC
+        const dstTokenAddress = getTokenAddress(destinationChainId, selectedToken.symbol); // 目标代币是用户选择的代币
+        
+        console.log(`API request: srcChain=${selectedChainId}, srcToken=${srcTokenAddress}, dstChain=${destinationChainId}, dstToken=${dstTokenAddress}`);
+        
+        // 使用真实API调用，不使用测试模式
+        const useTestMode = false; // 设置为false以使用真实API调用
+        
+        // 获取USDC的精度，USDC是6位小数
+        const usdcDecimals = 6;
+        
+        // 调用1inch API获取报价
         const quote = await getQuote({
           srcChain: selectedChainId,
           dstChain: destinationChainId,
-          srcTokenAddress: selectedToken.address,
-          dstTokenAddress: selectedToken.address, // Same token on different chain
-          amount: amountInUnits,
-          walletAddress: defaultWalletAddress,
-          enableEstimate: true
+          amount: (tokenAmount * Math.pow(10, usdcDecimals)).toString(), // 使用USDC的6位小数精度
+          srcTokenAddress: srcTokenAddress,
+          dstTokenAddress: dstTokenAddress,
+          walletAddress: '0x0000000000000000000000000000000000000000',
+          enableEstimate: true,
+          useTestData: useTestMode // 将测试模式关闭
         });
         
         if (isMounted) {
           setQuoteData(quote);
           
-          // Calculate the fee and estimated amount based on the quote
-          const receivedAmount = parseFloat(quote.dstTokenAmount) / Math.pow(10, selectedToken.decimals);
-          const feeAmount = parseFloat(amount) - receivedAmount;
+          let receivedAmount = 0;
+          let adjustedFee = 0; // Default fee
+          let finalAmount = 0; // Default final amount
+          const feeAmountFromEstimate = tokenAmount * 0.003; // Fallback estimate fee
+          const displayDecimals = selectedToken.symbol === 'ETH' ? 8 : 4; // Display decimals
           
-          setEstimatedReceived(receivedAmount.toFixed(selectedToken.decimals === 6 ? 2 : 4));
-          setFee(feeAmount.toFixed(selectedToken.decimals === 6 ? 2 : 4));
+          if (quote && quote.dstTokenAmount) {
+            // Determine receivedAmount based on token type and decimals
+            if (selectedToken.symbol === 'ETH') {
+              const dstTokenAmountStr = quote.dstTokenAmount;
+              const ethAmount = Number(dstTokenAmountStr) / Math.pow(10, 18);
+              console.log('原始API返回的dstTokenAmount (ETH):', dstTokenAmountStr);
+              console.log('转换为ETH (18位小数):', ethAmount);
+              receivedAmount = ethAmount;
+            } else {
+              const dstDecimals = selectedToken.decimals;
+              receivedAmount = parseFloat(quote.dstTokenAmount) / Math.pow(10, dstDecimals);
+              console.log('原始API返回的dstTokenAmount (Other):', quote.dstTokenAmount);
+              console.log('转换为代币单位:', receivedAmount);
+            }
+            
+            // Fee calculation logic now runs *after* receivedAmount is set for all types
+            const hasValidPresetCost = (
+              q: QuoteOutput | null, 
+              presetKey: string
+            ): boolean => {
+              if (!q || !q.presets) return false;
+              
+              // 安全地访问预设
+              const preset = q.presets[presetKey as keyof typeof q.presets];
+              return !!(preset && 'costInDstToken' in preset && preset.costInDstToken);
+            };
+            
+            if (quote && 
+                quote.recommendedPreset && 
+                hasValidPresetCost(quote, quote.recommendedPreset)) {
+              
+              const recommendedPreset = quote.recommendedPreset as keyof typeof quote.presets;
+              const preset = quote.presets[recommendedPreset]!;
+              
+              // Ensure correct decimals for fee calculation (ETH is 18)
+              const feeCalcDecimals = selectedToken.symbol === 'ETH' ? 18 : selectedToken.decimals;
+              const apiFeeCost = parseFloat(preset.costInDstToken!) / Math.pow(10, feeCalcDecimals);
+              console.log('API fee cost (token units):', apiFeeCost);
+              
+              // --- New Fee Logic --- 
+              const thresholdFee = receivedAmount * 0.05; // Calculate 5% threshold
+              
+              if (apiFeeCost < thresholdFee) {
+                // If API fee is less than 5%, charge 5%
+                adjustedFee = thresholdFee;
+                console.log(`API fee (${apiFeeCost.toFixed(displayDecimals)}) is less than 5% threshold (${thresholdFee.toFixed(displayDecimals)}), charging threshold: ${adjustedFee.toFixed(displayDecimals)}`);
+              } else {
+                // If API fee is 5% or more, charge 1.2x the API fee
+                adjustedFee = apiFeeCost * 1.2;
+                console.log(`API fee (${apiFeeCost.toFixed(displayDecimals)}) is >= 5% threshold (${thresholdFee.toFixed(displayDecimals)}), charging 1.2x = ${adjustedFee.toFixed(displayDecimals)}`);
+              }
+              // --- End New Fee Logic ---
+            } else {
+              // 使用估算费用
+              console.log('Using fallback estimated fee logic.');
+              // Even in fallback, apply the adjusted fee logic if possible, otherwise use basic estimate
+              // Note: This fallback fee logic might need refinement depending on desired behavior when API fee is missing
+              adjustedFee = feeAmountFromEstimate * exchangeRate; // Basic estimate for fee
+            }
+            
+            finalAmount = receivedAmount - adjustedFee;
+            if (finalAmount < 0) finalAmount = 0;
+            
+            // Set state AFTER all calculations inside this block
+            setEstimatedReceived(finalAmount.toFixed(displayDecimals));
+            setFee(adjustedFee.toFixed(displayDecimals));
+          } else {
+            // Handle case where quote or dstTokenAmount is missing
+            console.log('Quote or dstTokenAmount missing, using fallback exchange rate for calculation.');
+            receivedAmount = tokenAmount * exchangeRate; // Use fallback rate
+            const fee = tokenAmount * 0.003; // Basic fallback fee
+            finalAmount = receivedAmount - fee * exchangeRate;
+            if (finalAmount < 0) finalAmount = 0;
+            // Set state in this fallback case
+            setFee(fee.toFixed(displayDecimals));
+            setEstimatedReceived(finalAmount.toFixed(displayDecimals));
+          }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching quote:', error);
-        // Fallback to simple estimation if the API call fails
+        console.error('Error details:', error.details || 'No detailed error information available');
+        
+        // 显示错误通知
+        toast({
+          title: "获取报价失败",
+          description: `API错误: ${error.message || '未知错误'}。使用估算值替代。`,
+          variant: "destructive"
+        });
+        
+        // Initialize finalAmount in catch block as well
+        let finalAmount = 0; // Or handle based on error
+        
+        // 使用简单估算作为API调用失败的后备方案
         if (isMounted) {
           const amountNum = parseFloat(amount);
-          const fee = amountNum * 0.003; // 0.3% fee assumed
-          setFee(fee.toFixed(selectedToken.decimals === 6 ? 2 : 4));
-          setEstimatedReceived((amountNum - fee).toFixed(selectedToken.decimals === 6 ? 2 : 4));
+          let exchangeRate = 1; // Default rate
+          
+          // 如果是ETH，根据当前市场价格进行转换
+          if (selectedToken.symbol === 'ETH') {
+            exchangeRate = 0.0003; // 1 USDC = 0.0003 ETH
+          } else if (selectedToken.symbol === 'WBTC') {
+            exchangeRate = 0.00002; // 1 USDC = 0.00002 WBTC
+          }
+          
+          const fee = amountNum * 0.003; // 假设0.3%的费用
+          receivedAmount = amountNum * exchangeRate; // Estimate received before fee
+          finalAmount = receivedAmount - (fee * exchangeRate); // Assign to existing let
+          if (finalAmount < 0) finalAmount = 0;
+          
+          setFee(fee.toFixed(selectedToken.decimals === 6 ? 4 : 6));
+          setEstimatedReceived(finalAmount.toFixed(6));
         }
       } finally {
         if (isMounted) {
@@ -254,7 +446,7 @@ function IntentPayContent() {
     };
     
     // Debounce the quote fetch to avoid too many API calls
-    const debounceTimeout = setTimeout(fetchQuote, 500);
+    const debounceTimeout = setTimeout(fetchTokenQuote, 500);
     
     return () => {
       isMounted = false;
@@ -343,7 +535,7 @@ function IntentPayContent() {
         
         toast({
           title: "Payment Successful",
-          description: "Your transaction has been submitted to receive {estimatedReceived} {selectedToken?.symbol} at {recipientAddress.substring(0, 6)}...{recipientAddress.substring(recipientAddress.length - 4)}",
+          description: `Your transaction has been submitted to receive ${estimatedReceived} ${selectedToken?.symbol} at ${formatAddress(recipientAddress)}`,
           variant: "default",
         });
       } else {
@@ -447,8 +639,7 @@ function IntentPayContent() {
         </div>
         <h1 className="text-2xl font-bold mb-2">Payment Successful!</h1>
         <p className="text-gray-600 dark:text-gray-300 text-center mb-6">
-          Your transaction has been submitted to receive {estimatedReceived} {selectedToken?.symbol} at{' '}
-          {recipientAddress.substring(0, 6)}...{recipientAddress.substring(recipientAddress.length - 4)}
+          Your transaction has been submitted to receive {estimatedReceived} {selectedToken?.symbol} at {formatAddress(recipientAddress)}
         </p>
         <Button
           onClick={() => window.location.href = '/'}
@@ -469,41 +660,54 @@ function IntentPayContent() {
   );
   
   // Fix the network logo type safety issue by explicitly defining valid chain IDs
-  const SUPPORTED_CHAIN_IDS = [8453, 137] as const;
+  const SUPPORTED_CHAIN_IDS = [1, 56, 137, 42161, 100, 10, 8453, 43114, 324, 59144] as const;
   type SupportedChainId = typeof SUPPORTED_CHAIN_IDS[number];
 
   // Network icon component
   const NetworkIcon = ({ chainId }: { chainId: number }) => {
-    const networkName = CHAIN_NAMES[chainId.toString() as keyof typeof CHAIN_NAMES] || "Unknown";
-    
-    // Map chainId to icon path
-    const getNetworkIconPath = (id: number) => {
-      const chainMap: Record<number, string> = {
-        8453: "/assets/chains/base.svg",  // Base
-        137: "/assets/chains/polygon.svg"  // Polygon
-      };
-      
-      return chainMap[id] || "";
-    };
-    
-    const iconPath = getNetworkIconPath(chainId);
+    const chainInfo = CHAIN_INFO.find(chain => chain.id === chainId);
+    const networkName = chainInfo?.name || CHAIN_NAMES[chainId.toString() as keyof typeof CHAIN_NAMES] || "Unknown";
     
     return (
       <div className="flex items-center gap-2">
         <div className="h-5 w-5 relative overflow-hidden rounded-full bg-[#232853]">
-          {iconPath ? (
+          {chainInfo?.icon ? (
             <Image
-              src={iconPath}
+              src={chainInfo.icon}
               width={20}
               height={20}
               alt={networkName}
               className="h-full w-full object-contain"
+              unoptimized
             />
           ) : (
             <Globe className="h-full w-full text-[#c2c6ff]" />
           )}
         </div>
         <span className="ml-2">{networkName}</span>
+      </div>
+    );
+  };
+
+  // Network icon only (without text) - for use in the selector
+  const NetworkIconOnly = ({ chainId }: { chainId: number }) => {
+    const chainInfo = CHAIN_INFO.find(chain => chain.id === chainId);
+    const networkName = chainInfo?.name || CHAIN_NAMES[chainId.toString() as keyof typeof CHAIN_NAMES] || "Unknown";
+    
+    return (
+      <div className="h-8 w-8 relative overflow-hidden rounded-full flex items-center justify-center">
+        {chainInfo?.icon ? (
+          <Image
+            src={chainInfo.icon}
+            width={32}
+            height={32}
+            alt={networkName}
+            className="h-full w-full object-contain"
+            unoptimized
+          />
+        ) : (
+          <Globe className="h-5 w-5 text-[#c2c6ff]" />
+        )}
       </div>
     );
   };
@@ -675,8 +879,8 @@ function IntentPayContent() {
                 aria-label="Select destination chain"
                 title="Select destination chain"
               >
-                <NetworkIcon chainId={destinationChainId} />
-                <span className="ml-2">Destination: {CHAIN_NAMES[destinationChainId.toString() as keyof typeof CHAIN_NAMES] || 'Select Network'}</span>
+                <NetworkIconOnly chainId={destinationChainId} />
+                <span className="ml-2">{CHAIN_NAMES[destinationChainId.toString() as keyof typeof CHAIN_NAMES]}</span>
               </Button>
               <Button 
                 type="button" 
@@ -687,6 +891,46 @@ function IntentPayContent() {
               >
                 <Settings className="h-4 w-4" />
               </Button>
+            </div>
+            
+            {/* 当前选择的Token和Chain信息显示 */}
+            <div className="bg-[#232853]/50 rounded-lg p-3 mb-4 border border-[#2a3156]">
+              <h3 className="text-[#c2c6ff] text-sm font-medium mb-2">当前选择</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center">
+                  <div className="bg-[#191d3e] rounded-full h-6 w-6 flex items-center justify-center mr-2 overflow-hidden">
+                    {typeof destinationChainId === 'number' && (
+                      <NetworkIconOnly chainId={destinationChainId} />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs text-[#8a8dbd]">网络</p>
+                    <p className="text-sm text-white">
+                      {typeof destinationChainId === 'number' && CHAIN_NAMES[destinationChainId.toString() as keyof typeof CHAIN_NAMES] || 'Unknown'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  <div className="bg-[#191d3e] rounded-full h-6 w-6 flex items-center justify-center mr-2 overflow-hidden">
+                    {selectedToken?.logoURI ? (
+                      <Image 
+                        src={selectedToken.logoURI} 
+                        width={16} 
+                        height={16} 
+                        alt={selectedToken.symbol || "Token"} 
+                        className="h-4 w-4 object-contain"
+                        unoptimized
+                      />
+                    ) : (
+                      <DollarSign className="h-3 w-3 text-[#c2c6ff]" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs text-[#8a8dbd]">代币</p>
+                    <p className="text-sm text-white">{selectedToken?.symbol || "USDC"}</p>
+                  </div>
+                </div>
+              </div>
             </div>
             
             {/* Payment options - replacing the Pay Now button */}
@@ -759,10 +1003,10 @@ function IntentPayContent() {
             </div>
             <div className="token-selector-area custom-scrollbar">
               <div className="space-y-2">
-                {tokenSearch.loading ? (
+                {isLoadingTokens ? (
                   <div className="py-10 flex flex-col items-center justify-center text-[#8a8dbd]">
                     <Loader className="h-10 w-10 animate-spin mb-2" />
-                    <p>Searching tokens...</p>
+                    <p>Loading tokens...</p>
                   </div>
                 ) : tokenSearch.results.length > 0 ? (
                   tokenSearch.results.map((token) => (
@@ -779,7 +1023,14 @@ function IntentPayContent() {
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-[#30365c] flex items-center justify-center overflow-hidden">
                           {token.logoURI ? (
-                            <img src={token.logoURI} alt={token.symbol} className="h-full w-full object-contain" />
+                            <Image 
+                              src={token.logoURI}
+                              alt={token.symbol}
+                              width={32}
+                              height={32}
+                              className="h-full w-full object-contain"
+                              unoptimized
+                            />
                           ) : (
                             <DollarSign className="h-4 w-4 text-[#c2c6ff]" />
                           )}
@@ -932,7 +1183,7 @@ function IntentPayContent() {
             >
               <X className="h-5 w-5" />
             </button>
-            <h3 className="font-medium text-lg mb-3 text-white">Select Destination Network</h3>
+            <h3 className="font-medium text-lg mb-3 text-white">选择网络</h3>
             <div className="space-y-2 max-h-[60vh] overflow-y-auto custom-scrollbar">
               {availableChains.map((chainId) => (
                 <button
@@ -951,10 +1202,8 @@ function IntentPayContent() {
                   title={`Select ${CHAIN_NAMES[chainId.toString() as keyof typeof CHAIN_NAMES]}`}
                 >
                   <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-[#232853] flex items-center justify-center mr-3 overflow-hidden">
-                      <NetworkIcon chainId={chainId} />
-                    </div>
-                    <span>{CHAIN_NAMES[chainId.toString() as keyof typeof CHAIN_NAMES]}</span>
+                    <NetworkIconOnly chainId={chainId} />
+                    <span className="ml-3">{CHAIN_NAMES[chainId.toString() as keyof typeof CHAIN_NAMES]}</span>
                   </div>
                   {destinationChainId === chainId && (
                     <Check className="h-5 w-5 text-[#0074d9]" />
@@ -975,6 +1224,10 @@ function IntentPayContent() {
         {/* Token Amount Info */}
         <div className="text-sm space-y-5 mt-4">
           <div className="flex justify-between items-center px-3 py-1">
+            <span className="text-[#8a8dbd]">Recipient:</span>
+            <span className="font-medium">{formatAddress(recipientAddress)}</span>
+          </div>
+          <div className="flex justify-between items-center px-3 py-1">
             <span className="text-[#8a8dbd]">Amount:</span>
             <span className="font-medium">
               {isQuoteLoading ? (
@@ -983,7 +1236,7 @@ function IntentPayContent() {
                   Loading...
                 </div>
               ) : (
-                `${amount || '0'} ${selectedToken?.symbol || 'USDC'}`
+                `${amount || '0'} ${'USDC'}`
               )}
             </span>
           </div>
@@ -993,7 +1246,7 @@ function IntentPayContent() {
           </div>
           <div className="flex justify-between items-center px-3 py-1">
             <span className="text-[#8a8dbd]">Est. received:</span>
-            <span className="font-medium">{estimatedReceived} {selectedToken?.symbol || 'USDC'}</span>
+            <span className="font-medium">{estimatedReceived} {selectedToken?.symbol === 'ETH' ? 'ETH' : (selectedToken?.symbol || 'USDC')}</span>
           </div>
           {quoteData && (
             <>
