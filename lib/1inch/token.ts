@@ -36,8 +36,8 @@ interface CachedTokenData {
   timestamp: number;
 }
 
-// Cache duration in milliseconds (30 minutes)
-const CACHE_DURATION = 30 * 60 * 1000;
+// Cache duration in milliseconds (2 hours instead of 30 minutes)
+const CACHE_DURATION = 2 * 60 * 60 * 1000;
 
 // USDC token addresses for different chains
 export const USDC_ADDRESSES: Record<number, string> = {
@@ -95,28 +95,92 @@ export async function searchTokensApi(
   }
 }
 
+// In-memory data cache
+let memoryCache: CachedTokenData | null = null;
+
+// Flag to prevent multiple concurrent API calls
+let isTokenListFetching = false;
+
+// Promise to track ongoing fetch operations
+let currentFetchPromise: Promise<TokenListResponseDto> | null = null;
+
 /**
  * Get all 1inch whitelisted tokens across multiple chains
- * Uses localStorage caching to improve performance and backend API route for security
+ * Uses in-memory and localStorage caching to improve performance
+ * Includes request deduplication to prevent API overloading
  */
 export async function getMultiChainTokenList(): Promise<TokenListResponseDto> {
-  // Try to get data from cache first
+  // First check memory cache - this is fastest
+  if (memoryCache && (Date.now() - memoryCache.timestamp < CACHE_DURATION)) {
+    return memoryCache.data;
+  }
+  
+  // Then check localStorage cache
   const cachedData = getCachedTokens();
   if (cachedData) {
+    // Store in memory for faster future access
+    memoryCache = {
+      data: cachedData,
+      timestamp: Date.now()
+    };
     return cachedData;
   }
-
+  
+  // If there's already a request in progress, wait for it instead of making a new one
+  if (isTokenListFetching && currentFetchPromise) {
+    try {
+      return await currentFetchPromise;
+    } catch (error) {
+      console.error('Error in ongoing token fetch:', error);
+      // Continue to make a new request if the ongoing one failed
+    }
+  }
+  
+  isTokenListFetching = true;
+  
   try {
-    // Call the backend API route instead of directly calling 1inch API
-    const response = await axios.get('/api/1inch/token-list');
+    // Create a new promise for this fetch operation
+    currentFetchPromise = (async () => {
+      const response = await axios.get('/api/1inch/token-list');
+      const data = response.data;
+      
+      // Validate the response data
+      if (!data || !data.tokens || !Array.isArray(data.tokens)) {
+        console.error('Invalid token list format received:', data);
+        throw new Error('Invalid token list data format');
+      }
+      
+      // Store in both memory and localStorage
+      memoryCache = {
+        data,
+        timestamp: Date.now()
+      };
+      cacheTokenData(data);
+      
+      return data;
+    })();
     
-    // Cache the result
-    cacheTokenData(response.data);
-    
-    return response.data;
+    // Wait for the fetch to complete and return results
+    return await currentFetchPromise;
   } catch (error) {
     console.error('Error fetching token list:', error);
+    
+    // If memory cache exists but is expired, use it anyway in case of error
+    if (memoryCache && memoryCache.data) {
+      return memoryCache.data;
+    }
+    
+    // Last resort - check localStorage again
+    const lastResortCache = getCachedTokens();
+    if (lastResortCache) {
+      return lastResortCache;
+    }
+    
     throw error;
+  } finally {
+    // Reset flags when done (success or error)
+    isTokenListFetching = false;
+    currentFetchPromise = null;
   }
 }
 
@@ -127,12 +191,22 @@ export function getTokensByChain(chainId: number, tokenList?: TokenListResponseD
   if (!tokenList) {
     const cachedData = getCachedTokens();
     if (!cachedData) {
+      console.warn('No cached token data available');
       return [];
     }
     tokenList = cachedData;
   }
   
-  return tokenList.tokens.filter(token => token.chainId === chainId);
+  // Validate tokenList structure
+  if (!tokenList.tokens || !Array.isArray(tokenList.tokens)) {
+    console.error('Invalid token list structure:', tokenList);
+    return [];
+  }
+  
+  const filteredTokens = tokenList.tokens.filter(token => token.chainId === chainId);
+  console.log(`Found ${filteredTokens.length} tokens for chain ID ${chainId}`);
+  
+  return filteredTokens;
 }
 
 /**
@@ -151,20 +225,27 @@ export function searchTokens(
     tokenList = cachedData;
   }
   
-  const normalizedQuery = query.toLowerCase().trim();
-  
-  let filteredTokens = tokenList.tokens;
-  
-  // Filter by chain if specified
-  if (chainId !== undefined) {
-    filteredTokens = filteredTokens.filter(token => token.chainId === chainId);
+  if (!query) {
+    return chainId ? 
+      tokenList.tokens.filter(token => token.chainId === chainId) : 
+      tokenList.tokens;
   }
   
-  // Search by name or symbol
-  return filteredTokens.filter(token => 
-    token.name.toLowerCase().includes(normalizedQuery) || 
-    token.symbol.toLowerCase().includes(normalizedQuery)
-  );
+  const normalizedQuery = query.toLowerCase().trim();
+  
+  const matched = tokenList.tokens.filter(token => {
+    // Filter by chainId if provided
+    if (chainId && token.chainId !== chainId) {
+      return false;
+    }
+    
+    // Match by name, symbol, or address
+    return token.name.toLowerCase().includes(normalizedQuery) || 
+           token.symbol.toLowerCase().includes(normalizedQuery) || 
+           token.address.toLowerCase().includes(normalizedQuery);
+  });
+  
+  return matched;
 }
 
 /**
@@ -187,6 +268,11 @@ function cacheTokenData(data: TokenListResponseDto): void {
  */
 function getCachedTokens(): TokenListResponseDto | null {
   try {
+    // If we have in-memory cache, use it first
+    if (memoryCache && (Date.now() - memoryCache.timestamp < CACHE_DURATION)) {
+      return memoryCache.data;
+    }
+    
     const cachedData = localStorage.getItem('inch_token_cache');
     if (!cachedData) return null;
     
@@ -195,6 +281,8 @@ function getCachedTokens(): TokenListResponseDto | null {
     
     // Return cached data if it's still fresh
     if (now - parsedCache.timestamp < CACHE_DURATION) {
+      // Store in memory for faster access next time
+      memoryCache = parsedCache;
       return parsedCache.data;
     }
     

@@ -30,11 +30,21 @@ export function QRScannerModal({ onClose, onResult }: QRScannerModalProps) {
 
     // 檢查是否為以太坊地址
     const ethAddressRegex = /^(0x)?[0-9a-fA-F]{40}$/;
+    
+    // 安全处理地址格式
     let address = result;
+    
+    // 处理可能的格式，如ethereum:0x...
+    if (result.includes(':')) {
+      const parts = result.split(':');
+      if (parts.length > 1 && parts[1]) {
+        address = parts[1];
+      }
+    }
 
-    if (ethAddressRegex.test(result)) {
+    if (ethAddressRegex.test(address)) {
       // 確保地址包含0x前綴
-      address = result.startsWith('0x') ? result : `0x${result}`;
+      address = address.startsWith('0x') ? address : `0x${address}`;
     }
 
     // 延遲一下以顯示載入狀態
@@ -53,7 +63,7 @@ export function QRScannerModal({ onClose, onResult }: QRScannerModalProps) {
   // 處理Demo掃描
   const handleDemoScan = () => {
     // 用一个可靠的演示地址，确保格式正确
-    handleScan('0x71C7656EC7ab88b098defB751B7401B5f6d8976F');
+    handleScan('0x67aad1351bb0665d2a560a52bef9ab8621567d25');
   };
 
   // 初始化攝像頭

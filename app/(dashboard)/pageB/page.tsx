@@ -95,8 +95,8 @@ export default function PageB() {
                 Payment successful!
               </div>
             ) : (
-              <Button type="submit" className="w-full">
-                Buy USDT
+              <Button type="submit" className="w-full bg-primary">
+                Buy USDC
               </Button>
             )}
           </CardFooter>
