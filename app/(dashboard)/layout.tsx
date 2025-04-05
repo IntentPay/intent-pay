@@ -36,6 +36,8 @@ import { SearchInput } from './search';
 import { Toaster } from '@/components/ui/toaster';
 import MiniKitProvider from '@/lib/minikit-provider';
 import { VerificationGate } from '@/components/worldid/VerificationGate';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -74,7 +76,7 @@ function DesktopNav() {
           <span className="sr-only">IntentPay Team</span>
         </Link>
 
-        <NavItem href="/analytics" label="Dashboard">
+        <NavItem href="/" label="Dashboard">
           <Home className="h-5 w-5" />
         </NavItem>
 
@@ -139,7 +141,7 @@ function MobileNav() {
             <span className="sr-only">IntentPay Team</span>
           </Link>
           <Link
-            href="/analytics"
+            href="/"
             onClick={handleLinkClick}
             className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
           >
@@ -222,32 +224,75 @@ function DashboardBrandHeader() {
  * Bottom Navigation Bar
  */
 function MobileBottomNav() {
+  const pathname = usePathname();
+
+  const navItems = [
+    { href: '/', label: 'Home', icon: Home },
+    { href: '/swap', label: 'Wallet', icon: Wallet },
+    { href: '/track', label: 'Track', icon: Locate },
+    { href: '/card', label: 'Card', icon: CreditCard }
+  ];
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 mx-auto flex h-16 max-w-md items-center justify-around rounded-t-xl border-t bg-white shadow-lg sm:hidden">
-      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-        <Home className="w-5 h-5" />
-        <span className="text-xs">Home</span>
-      </button>
+    <nav
+      className={cn(
+        'fixed bottom-0 left-0 right-0 z-50 mx-auto flex h-16 max-w-md items-center justify-around sm:hidden',
+        'rounded-t-xl border-t',
+        "bg-[url('/assets/brushed-alum.png')]",
+        'bg-[#d1c4d5c4]',
+        'bg-cover bg-no-repeat bg-center',
+        'shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_2px_5px_rgba(0,0,0,0.08)]',
+        'backdrop-blur-sm backdrop-saturate-150 border-zinc-300 px-4'
+      )}
+    >
+      {navItems.slice(0, 2).map((item) => {
+        const Icon = item.icon;
+        const active = pathname === item.href;
 
-      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-        <Wallet className="w-5 h-5" />
-        <span className="text-xs">Wallet</span>
-      </button>
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              'flex flex-col items-center justify-center px-2 py-1 transition-all',
+              'rounded-md text-xs',
+              active
+                ? 'bg-gray-200 text-black shadow-inner font-medium'
+                : 'text-gray-500 hover:bg-gray-100 hover:shadow'
+            )}
+          >
+            <Icon className={cn('w-5 h-5 mb-0.5', active ? 'text-indigo-600' : '')} />
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
 
-      {/* 中間 Logo */}
+      {/* Middle Logo */}
       <div className="flex h-12 w-12 -mt-10 items-center justify-center rounded-full border bg-white shadow-md">
         <Circle className="h-6 w-6 text-indigo-600" />
       </div>
 
-      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-        <Locate className="w-5 h-5" />
-        <span className="text-xs">Track</span>
-      </button>
+      {navItems.slice(2).map((item) => {
+        const Icon = item.icon;
+        const active = pathname === item.href;
 
-      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-        <CreditCard className="w-5 h-5" />
-        <span className="text-xs">Card</span>
-      </button>
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              'flex flex-col items-center justify-center px-2 py-1 transition-all',
+              'rounded-md text-xs',
+              active
+                ? 'bg-gray-200 text-black shadow-inner font-medium'
+                : 'text-gray-500 hover:bg-gray-100 hover:shadow'
+            )}
+          >
+            <Icon className={cn('w-5 h-5 mb-0.5', active ? 'text-indigo-600' : '')} />
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
     </nav>
   );
 }
