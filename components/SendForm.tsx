@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { isValidEthereumAddress } from '@/lib/utils';
 import { getMultiChainTokenList, getTokensByChain, TokenInfoDto, getUsdcTokenInfo } from '@/lib/1inch/token';
 import { SUPPORTED_CHAINS, CHAIN_NAMES } from '@/lib/1inch/config';
-import { ChevronDown, Search, Loader2 } from 'lucide-react';
+import { ChevronDown, Search, Loader2, Wallet, CreditCard, CircleX, QrCode } from 'lucide-react';
 import { useToast } from '@/components/ui/toast/use-toast';
+import ApplePayButton from '@/components/applePay/ApplePay';
 
 // Form validation schema
 const sendFormSchema = z.object({
@@ -53,6 +54,7 @@ export function SendForm({ onSend, maxAmount = '0', onCancel }: SendFormProps) {
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredTokens, setFilteredTokens] = useState<TokenInfoDto[]>([]);
+  const [qrScannerActive, setQrScannerActive] = useState(false);
 
   // Initialize default chain
   useEffect(() => {
@@ -198,163 +200,137 @@ export function SendForm({ onSend, maxAmount = '0', onCancel }: SendFormProps) {
     }
   };
 
+  const validateFields = () => {
+    try {
+      sendFormSchema.parse(values);
+      return true;
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const newErrors: Partial<Record<keyof SendFormValues, string>> = {};
+        
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            const field = err.path[0] as keyof SendFormValues;
+            newErrors[field] = err.message;
+          }
+        });
+        
+        setErrors(newErrors);
+      }
+      return false;
+    }
+  };
+
   return (
-    <Card className="w-full">
+    <Card className="w-full bg-[#10173a] border-[#2a3156] shadow-[0_0_15px_rgba(0,240,255,0.15)] card-hover neon-pulse">
       <CardHeader>
-        <CardTitle>Send USDC</CardTitle>
-        <CardDescription>Send USDC to any Ethereum address without paying gas fees</CardDescription>
+        <CardTitle className="text-white text-xl flex items-center">
+          <span className="bg-gradient-to-r from-[#ff2a6d] to-[#d300c5] bg-clip-text text-transparent hologram-text">
+            Send Payment
+          </span>
+        </CardTitle>
+        <CardDescription className="text-[#8a8dbd]">
+          Enter recipient details and amount
+        </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="recipient">Recipient Address</Label>
-            <Input
-              id="recipient"
-              placeholder="0x..."
-              value={values.recipient || ''}
-              onChange={(e) => handleChange('recipient', e.target.value)}
-              className={errors.recipient ? "border-red-500" : ""}
-            />
-            {errors.recipient && (
-              <p className="text-sm text-red-500">{errors.recipient}</p>
-            )}
-          </div>
-          
-          {/* Target Chain Selector */}
-          <div className="space-y-2">
-            <Label>Target Chain</Label>
+            <div className="flex justify-between">
+              <Label htmlFor="recipient" className="text-[#c2c6ff] neon-text">Recipient</Label>
+            </div>
             <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowChainSelector(!showChainSelector)}
-                className="w-full flex items-center justify-between px-4 py-2 border rounded-md"
-                aria-label={`Select target blockchain, currently: ${selectedChain?.name || 'none selected'}`}
-              >
-                <span>{selectedChain?.name || 'Select Chain'}</span>
-                <ChevronDown className="h-4 w-4" />
-              </button>
-              
-              {showChainSelector && (
-                <div className="absolute left-0 right-0 mt-1 p-2 bg-white dark:bg-gray-800 border rounded-md shadow-lg z-10">
-                  <div className="text-sm text-gray-500 px-2 py-1 border-b mb-2">Select Chain</div>
-                  {Object.entries(CHAIN_NAMES).map(([id, name]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => handleChainSelect(id)}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-md ${
-                        values.chainId === id ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }`}
-                      aria-label={`Select ${name} blockchain`}
-                    >
-                      <span>{name}</span>
-                    </button>
-                  ))}
+              <Input
+                id="recipient"
+                type="text"
+                placeholder="ethereum:0x..."
+                value={values.recipient || ''}
+                onChange={(e) => handleChange('recipient', e.target.value)}
+                className={`bg-[#191d3e] border-[#2a3156] text-white focus:border-[#00f0ff] focus:ring-[#00f0ff] focus:ring-opacity-30 input-focus ${errors.recipient ? "border-[#ff2a6d]" : ""}`}
+              />
+              {qrScannerActive && (
+                <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 text-[#00f0ff] button-hover"
+                    onClick={() => setQrScannerActive(false)}
+                  >
+                    <CircleX className="h-5 w-5" />
+                  </Button>
+                </div>
+              )}
+              {!qrScannerActive && (
+                <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 text-[#00f0ff] hover:text-[#05ffa1] hover:bg-[#232853] button-hover"
+                    onClick={() => setQrScannerActive(true)}
+                  >
+                    <QrCode className="h-5 w-5" />
+                  </Button>
                 </div>
               )}
             </div>
+            {errors.recipient && (
+              <p className="text-sm text-[#ff2a6d] pink-neon-text">{errors.recipient}</p>
+            )}
+
+            {qrScannerActive && (
+              <div className="mt-4 bg-[#232853] p-4 rounded-xl border border-[#2a3156] glass-effect">
+                <div className="flex justify-between mb-2">
+                  <h3 className="text-[#c2c6ff] font-medium neon-text">Scan QR Code</h3>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0 text-[#00f0ff] button-hover"
+                    onClick={() => setQrScannerActive(false)}
+                  >
+                    <CircleX className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="aspect-square max-w-[250px] mx-auto mb-4 overflow-hidden">
+                  {/* QR Scanner Component would go here */}
+                  <div className="w-full h-full bg-[#0d1129] rounded-lg flex items-center justify-center hologram">
+                    <p className="text-[#8a8dbd] text-sm text-center px-4">QR Scanner Placeholder</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           
-          {/* Token Selector */}
           <div className="space-y-2">
-            <Label>Recipient Token</Label>
+            <div className="flex justify-between">
+              <Label htmlFor="chain" className="text-[#c2c6ff] neon-text">Chain</Label>
+            </div>
             <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowTokenSelector(!showTokenSelector)}
-                className="w-full flex items-center justify-between px-4 py-2 border rounded-md"
-                disabled={isLoadingTokens}
+              <select
+                id="chain"
+                value={values.chainId || ''}
+                onChange={(e) => handleChange('chainId', e.target.value)}
+                className="w-full bg-[#191d3e] border-[#2a3156] rounded-md text-white focus:border-[#00f0ff] focus:ring-[#00f0ff] focus:ring-opacity-30 pl-3 pr-10 py-2 input-focus"
+                aria-label="Select blockchain network"
               >
-                {isLoadingTokens ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Loading tokens...</span>
-                  </div>
-                ) : selectedToken ? (
-                  <div className="flex items-center gap-2">
-                    {selectedToken.logoURI && (
-                      <img 
-                        src={selectedToken.logoURI}
-                        alt={selectedToken.name}
-                        width={20}
-                        height={20}
-                        className="rounded-full"
-                        onError={(e) => {
-                          // Fallback when image fails to load
-                          (e.target as HTMLImageElement).src = "https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png";
-                        }}
-                      />
-                    )}
-                    <span>{selectedToken.symbol}</span>
-                  </div>
-                ) : (
-                  <span>Select Token</span>
-                )}
-                <ChevronDown className="h-4 w-4" />
-              </button>
-              
-              {showTokenSelector && (
-                <div className="absolute left-0 right-0 mt-1 p-2 bg-white dark:bg-gray-800 border rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
-                  <div className="sticky top-0 bg-white dark:bg-gray-800 pb-2">
-                    <div className="text-sm text-gray-500 px-2 py-1 border-b mb-2">Select Token</div>
-                    <div className="px-2">
-                      <div className="relative">
-                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <Input
-                          placeholder="Search name or paste address"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-8"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {isLoadingTokens ? (
-                    <div className="flex justify-center items-center py-4">
-                      <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
-                    </div>
-                  ) : filteredTokens.length === 0 ? (
-                    <div className="text-center py-4 text-gray-500">No tokens found</div>
-                  ) : (
-                    filteredTokens.map((token) => (
-                      <button
-                        key={token.address}
-                        type="button"
-                        onClick={() => handleTokenSelect(token)}
-                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-                      >
-                        <div className="flex items-center gap-2">
-                          {token.logoURI && (
-                            <img 
-                              src={token.logoURI}
-                              alt={token.name}
-                              width={24}
-                              height={24}
-                              className="rounded-full"
-                              onError={(e) => {
-                                // Fallback when image fails to load
-                                (e.target as HTMLImageElement).src = "https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png";
-                              }}
-                            />
-                          )}
-                          <div className="text-left">
-                            <div>{token.symbol}</div>
-                            <div className="text-xs text-gray-500">{token.name}</div>
-                          </div>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
+                {Object.entries(SUPPORTED_CHAINS).map(([name, id]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                <ChevronDown className="h-5 w-5 text-[#8a8dbd]" />
+              </div>
             </div>
           </div>
           
           <div className="space-y-2">
             <div className="flex justify-between">
-              <Label htmlFor="amount">Amount</Label>
-              <span className="text-sm text-gray-500">
+              <Label htmlFor="amount" className="text-[#c2c6ff] neon-text">Amount</Label>
+              <span className="text-sm text-[#8a8dbd]">
                 Available: {maxAmount} USDC
               </span>
             </div>
@@ -367,22 +343,72 @@ export function SendForm({ onSend, maxAmount = '0', onCancel }: SendFormProps) {
               max={maxAmount.toString()}
               value={values.amount || ''}
               onChange={(e) => handleChange('amount', e.target.value)}
-              className={errors.amount ? "border-red-500" : ""}
+              className={`bg-[#191d3e] border-[#2a3156] text-white focus:border-[#00f0ff] focus:ring-[#00f0ff] focus:ring-opacity-30 input-focus ${errors.amount ? "border-[#ff2a6d]" : ""}`}
             />
             {errors.amount && (
-              <p className="text-sm text-red-500">{errors.amount}</p>
+              <p className="text-sm text-[#ff2a6d] pink-neon-text">{errors.amount}</p>
             )}
           </div>
         </CardContent>
-        <CardFooter className="flex justify-between gap-2">
-          {onCancel && (
-            <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
-              Cancel
+        <CardFooter className="flex flex-col gap-4">
+          {/* 原始Send USDC按钮和取消按钮 */}
+          <div className="flex justify-between gap-2 w-full">
+            {onCancel && (
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={onCancel} 
+                className="flex-1 border-[#2a3156] text-[#c2c6ff] hover:bg-[#232853] hover:text-white button-hover"
+              >
+                Cancel
+              </Button>
+            )}
+            <Button 
+              type="submit" 
+              className="flex-1 bg-gradient-to-r from-[#00f0ff] to-[#05ffa1] hover:opacity-90 text-[#080f36] font-medium transition-all duration-200 button-hover" 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <div className="flex items-center">
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-t-transparent border-white rounded-full"></div>
+                  <span>Sending...</span>
+                </div>
+              ) : 'Send USDC'}
             </Button>
-          )}
-          <Button type="submit" className="flex-1" disabled={isSubmitting}>
-            {isSubmitting ? 'Sending...' : 'Send USDC'}
-          </Button>
+          </div>
+          
+          {/* 支付选项分隔线 */}
+          <div className="relative w-full flex items-center gap-2 my-2">
+            <div className="flex-grow h-px bg-[#2a3156]"></div>
+            <span className="text-sm text-[#8a8dbd] hologram-text">Or pay with</span>
+            <div className="flex-grow h-px bg-[#2a3156]"></div>
+          </div>
+          
+          {/* 添加World ID支付和Apple Pay按钮 */}
+          <div className="flex flex-col sm:flex-row gap-2 w-full">
+            <Button 
+              type="button" 
+              className="flex-1 bg-gradient-to-r from-[#d300c5] to-[#ff2a6d] hover:opacity-90 text-white font-medium transition-all duration-200 button-hover purple-pulse" 
+              onClick={() => {
+                // 确保表单验证通过
+                if (validateFields()) {
+                  // 这里可以处理World ID支付逻辑或者调用相应函数
+                  console.log('Processing World ID payment...');
+                  // TODO: 实现World ID支付
+                }
+              }}
+            >
+              <Wallet className="mr-2 h-4 w-4" />
+              Pay with World
+            </Button>
+            
+            <div className="flex-1">
+              <ApplePayButton 
+                amount={values.amount || '0.00'} 
+                label={`Pay ${values.amount || '0.00'} USDC`}
+              />
+            </div>
+          </div>
         </CardFooter>
       </form>
     </Card>

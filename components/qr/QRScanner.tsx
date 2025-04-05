@@ -63,7 +63,7 @@ export function QRScannerModal({ onClose, onResult }: QRScannerModalProps) {
   // 處理Demo掃描
   const handleDemoScan = () => {
     // 用一个可靠的演示地址，确保格式正确
-    handleScan('0x71C7656EC7ab88b098defB751B7401B5f6d8976F');
+    handleScan('0x67aad1351bb0665d2a560a52bef9ab8621567d25');
   };
 
   // 初始化攝像頭

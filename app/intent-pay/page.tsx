@@ -1,17 +1,50 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, Send, Info, Check, ChevronDown, ArrowDown, Settings, QrCode, CircleX, Search, Loader2 } from 'lucide-react';
+import { useState, useEffect, FormEvent, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { 
+  User2, 
+  Send, 
+  Info, 
+  Check, 
+  ChevronDown, 
+  ArrowDown, 
+  ArrowLeft, 
+  Settings, 
+  QrCode, 
+  CircleX, 
+  Search, 
+  Loader2, 
+  Wallet, 
+  CreditCard,
+  X,
+  CheckCircle,
+  AlertCircle,
+  Clipboard,
+  ChevronsUpDown,
+  Globe,
+  Loader,
+  DollarSign,
+  ScanLine
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Web3Avatar } from '@/components/wallet/Web3Avatar';
-import Link from 'next/link';
+import { SendForm } from '@/components/SendForm';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { SUPPORTED_CHAINS, CHAIN_NAMES } from '@/lib/1inch/config';
+import Image from 'next/image';
+import ApplePayButton from '@/components/applePay/ApplePay';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { getMultiChainTokenList, getTokensByChain, TokenInfoDto, getUsdcTokenInfo } from '@/lib/1inch/token';
 import { useToast } from '@/components/ui/use-toast';
 import { QRScannerModal } from '@/components/qr/QRScanner';
 import { MiniKit } from '@worldcoin/minikit-js';
-import { getMultiChainTokenList, getTokensByChain, searchTokensApi, TokenInfoDto, getUsdcTokenInfo } from '@/lib/1inch/token';
-import { SUPPORTED_CHAINS, CHAIN_NAMES } from '@/lib/1inch/config';
-import Image from 'next/image';
+import { searchTokensApi } from '@/lib/1inch/token';
 
 // Send haptic feedback
 const sendHapticHeavyCommand = () =>
@@ -35,31 +68,35 @@ function IntentPayContent() {
   const [recipientAddress, setRecipientAddress] = useState(addressParam || '');
   const [amount, setAmount] = useState('');
   const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE);
-  const [selectedChainId, setSelectedChainId] = useState('1'); // Default to Ethereum
+  const [selectedChainId, setSelectedChainId] = useState<number>(1); // Default to Ethereum
   const [showTokenSelector, setShowTokenSelector] = useState(false);
   const [estimatedReceived, setEstimatedReceived] = useState('0');
   const [fee, setFee] = useState('0');
   const [showSlippageSettings, setShowSlippageSettings] = useState(false);
   const [showChainSelector, setShowChainSelector] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [showQRScanner, setShowQRScanner] = useState(false);
   const [sourceTokenInfo, setSourceTokenInfo] = useState<TokenInfoDto | null>(null);
+  const [isValidAddress, setIsValidAddress] = useState(false);
   
-  // Token states - similar to FusionSwapForm
+  // Token states
   const [availableTokens, setAvailableTokens] = useState<TokenInfoDto[]>([]);
   const [filteredTokens, setFilteredTokens] = useState<TokenInfoDto[]>([]);
   const [selectedToken, setSelectedToken] = useState<TokenInfoDto | null>(null);
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [tokenSearchQuery, setTokenSearchQuery] = useState<string>('');
+  const [tokenSearch, setTokenSearch] = useState<{
+    loading: boolean;
+    results: TokenInfoDto[];
+  }>({ loading: false, results: [] });
   
   // Get current chain name
-  const chainName = selectedChainId ? CHAIN_NAMES[selectedChainId as keyof typeof CHAIN_NAMES] : '';
+  const chainName = selectedChainId ? CHAIN_NAMES[selectedChainId] : '';
   
   // Load USDC token info using 1inch API
   useEffect(() => {
     async function loadUsdcTokenInfo() {
       try {
-        const usdcInfo = await getUsdcTokenInfo(parseInt(selectedChainId));
+        const usdcInfo = await getUsdcTokenInfo(selectedChainId);
         if (usdcInfo) {
           setSourceTokenInfo(usdcInfo);
         }
@@ -73,103 +110,81 @@ function IntentPayContent() {
   
   // Load tokens when chain changes
   useEffect(() => {
-    let isMounted = true; // 防止组件卸载后设置状态
+    let isMounted = true;
     
-    async function loadTokens() {
-      if (!selectedChainId) return;
-      
+    const loadTokens = async () => {
       setIsLoadingTokens(true);
+      setTokenSearch({ loading: true, results: [] });
+      
       try {
-        const chainId = parseInt(selectedChainId);
+        const chainId = selectedChainId;
         
-        if (searchQuery.trim()) {
+        if (tokenSearchQuery.trim()) {
           // Use search API
-          const results = await searchTokensApi(searchQuery, chainId, 20);
+          const results = await searchTokensApi(tokenSearchQuery, chainId, 20);
           if (isMounted) {
-            setFilteredTokens(Array.isArray(results) ? results : []);
+            setTokenSearch({ loading: false, results: results });
           }
         } else {
-          // 获取所有代币
-          try {
-            const tokenListData = await getMultiChainTokenList();
-            if (!tokenListData || !tokenListData.tokens) {
-              throw new Error('Invalid token data');
-            }
-            
-            const chainTokens = getTokensByChain(chainId, tokenListData);
-            const tokenArray = Array.isArray(chainTokens) ? chainTokens : [];
-            
-            if (isMounted) {
-              // 一次性更新状态，减少渲染次数
-              setAvailableTokens(tokenArray);
-              setFilteredTokens(tokenArray);
-            }
-          } catch (innerError) {
-            console.error('Error processing token data:', innerError);
-            if (isMounted) {
-              setAvailableTokens([]);
-              setFilteredTokens([]);
-            }
-            throw innerError; // 向上传递错误以触发toast
+          // Get all tokens for this chain
+          const allTokens = await getTokensByChain(chainId);
+          if (isMounted) {
+            setAvailableTokens(allTokens);
+            setFilteredTokens(allTokens);
+            setTokenSearch({ loading: false, results: allTokens });
           }
         }
       } catch (error) {
         console.error('Error loading tokens:', error);
         if (isMounted) {
-          setAvailableTokens([]);
-          setFilteredTokens([]);
-          toast({
-            title: "Failed to load tokens",
-            description: "Please try again later",
-            variant: "destructive"
-          });
+          setTokenSearch({ loading: false, results: [] });
         }
       } finally {
         if (isMounted) {
           setIsLoadingTokens(false);
         }
       }
-    }
+    };
     
     loadTokens();
     
-    // 清理函数，防止内存泄漏
+    // Set default token (USDC) for the selected chain
+    const setDefaultToken = async () => {
+      try {
+        const usdcToken = await getUsdcTokenInfo(selectedChainId);
+        if (usdcToken) {
+          setSelectedToken(usdcToken);
+        }
+      } catch (error) {
+        console.error('Error setting default token:', error);
+      }
+    };
+    
+    setDefaultToken();
+    
     return () => {
       isMounted = false;
     };
-  }, [selectedChainId, searchQuery]); // 移除 toast 依赖
+  }, [selectedChainId, tokenSearchQuery]);
   
-  // 单独处理默认token选择，与token加载分离
-  useEffect(() => {
-    if (!selectedChainId || !availableTokens.length) return;
+  // Handle token search
+  const handleTokenSearch = async (query: string) => {
+    setTokenSearch({ loading: true, results: [] });
     
-    const chainId = parseInt(selectedChainId);
-    
-    // 只有在没有选择token或chain不匹配时才设置默认token
-    if (!selectedToken || selectedToken.chainId !== chainId) {
-      // 使用箭头函数而不是函数声明，避免严格模式下的错误
-      const setDefaultToken = async () => {
-        try {
-          // 先尝试设置USDC作为默认token
-          const usdcToken = await getUsdcTokenInfo(chainId);
-          if (usdcToken) {
-            setSelectedToken(usdcToken);
-          } else if (availableTokens.length > 0) {
-            // 如果没有USDC，使用第一个可用token
-            setSelectedToken(availableTokens[0]);
-          }
-        } catch (error) {
-          console.error('Error setting default token:', error);
-          // 出错时使用第一个可用token
-          if (availableTokens.length > 0) {
-            setSelectedToken(availableTokens[0]);
-          }
-        }
-      };
-      
-      setDefaultToken();
+    try {
+      if (query.trim()) {
+        const results = await searchTokensApi(query, selectedChainId, 20);
+        setTokenSearch({ loading: false, results: results });
+      } else {
+        // If no query, show all available tokens for this chain
+        const allTokens = await getTokensByChain(selectedChainId);
+        setTokenSearch({ loading: false, results: allTokens });
+      }
+    } catch (error) {
+      console.error('Error searching tokens:', error);
+      setTokenSearch({ loading: false, results: [] });
     }
-  }, [selectedChainId, availableTokens]); // 移除 selectedToken 依赖
+  };
   
   // Calculate estimated receipt amount
   useEffect(() => {
@@ -191,7 +206,7 @@ function IntentPayContent() {
   };
   
   // Handle payment submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     sendHapticHeavyCommand();
     
@@ -234,11 +249,11 @@ function IntentPayContent() {
   };
   
   // Select chain
-  const handleChainSelect = (chainId: string) => {
+  const handleChainSelect = (chainId: number) => {
     sendHapticHeavyCommand();
     setSelectedChainId(chainId);
     setShowChainSelector(false);
-    setSearchQuery('');
+    setTokenSearchQuery('');
   };
   
   // Select token
@@ -249,7 +264,7 @@ function IntentPayContent() {
   
   // Handle search query change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
+    setTokenSearchQuery(e.target.value);
   };
   
   // Handle QR scan result
@@ -281,6 +296,31 @@ function IntentPayContent() {
     setRecipientAddress('');
   };
   
+  // Validate Ethereum address
+  useEffect(() => {
+    if (recipientAddress) {
+      // 基本的以太坊地址验证
+      const isValid = /^(0x)?[0-9a-fA-F]{40}$/.test(recipientAddress);
+      setIsValidAddress(isValid);
+    } else {
+      setIsValidAddress(false);
+    }
+  }, [recipientAddress]);
+  
+  // Handle paste from clipboard
+  const handlePasteClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        // 移除可能的前缀，如 "ethereum:"
+        const cleanAddress = text.replace(/^ethereum:/i, '');
+        setRecipientAddress(cleanAddress);
+      }
+    } catch (error) {
+      console.error('Failed to read clipboard:', error);
+    }
+  };
+  
   if (paymentSuccess) {
     return (
       <div className="container max-w-md mx-auto p-4 flex flex-col items-center justify-center min-h-[70vh]">
@@ -303,241 +343,320 @@ function IntentPayContent() {
     );
   }
   
-  return (
-    <div className="container max-w-md mx-auto p-4">
-      <div className="mb-6 flex items-center">
-        <Link href="/" className="mr-4">
-          <Button variant="ghost" size="icon" className="rounded-full" title="Back to home">
-            <ArrowLeft size={20} />
-          </Button>
-        </Link>
-        <h1 className="text-xl font-bold">Pay with World App</h1>
-      </div>
+  // UI components from shadcn
+  // If these components don't exist, we'll create placeholders
+  const Separator = () => <div className="w-full h-px bg-[#2a3156] my-4"></div>;
+  const Skeleton = ({ className }: { className?: string }) => (
+    <div className={`bg-[#232853] animate-pulse rounded ${className || ''}`}></div>
+  );
+  
+  // Fix the network logo type safety issue by explicitly defining valid chain IDs
+  const SUPPORTED_CHAIN_IDS = [1, 42161, 8453, 43114] as const;
+  type SupportedChainId = typeof SUPPORTED_CHAIN_IDS[number];
+
+  // Network icon component
+  const NetworkIcon = ({ chainId }: { chainId: number }) => {
+    const networkName = CHAIN_NAMES[chainId] || "Unknown";
+    
+    // Map chainId to icon path
+    const getNetworkIconPath = (id: number) => {
+      const chainMap: Record<number, string> = {
+        1: "/assets/chains/ethereum.svg",  // Ethereum
+        42161: "/assets/chains/arbitrum.svg",  // Arbitrum
+        43114: "/assets/chains/avalanche.svg",  // Avalanche
+        8453: "/assets/chains/base.svg",  // Base
+        137: "/assets/chains/polygon.svg"  // Polygon
+      };
       
-      <div className="w-full max-w-md mx-auto bg-gray-900 shadow-lg rounded-2xl p-6 text-white">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Recipient Address */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label htmlFor="recipient" className="block text-sm font-medium text-gray-300">
-                Recipient Address
-              </label>
-              <Button 
-                type="button" 
-                variant="ghost" 
-                size="sm" 
-                className="h-6 px-2 text-xs text-gray-300 hover:text-white hover:bg-gray-800"
-                onClick={() => setShowQRScanner(true)}
-                title="Scan QR code"
-              >
-                <QrCode size={14} className="mr-1" />
-                Scan QR
-              </Button>
+      return chainMap[id] || "";
+    };
+    
+    const iconPath = getNetworkIconPath(chainId);
+    
+    return (
+      <div className="flex items-center gap-2">
+        <div className="h-5 w-5 relative overflow-hidden rounded-full bg-[#232853]">
+          {iconPath ? (
+            <Image
+              src={iconPath}
+              width={20}
+              height={20}
+              alt={networkName}
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <Globe className="h-full w-full text-[#c2c6ff]" />
+          )}
+        </div>
+        <span className="ml-2">{networkName}</span>
+      </div>
+    );
+  };
+
+  // Update comparisons to ensure types match - fix string/number comparisons
+  const isSelectedToken = (tokenAddress: string) => {
+    return selectedToken?.address.toLowerCase() === tokenAddress.toLowerCase();
+  };
+
+  // Update amount display to ensure consistent types
+  const displayAmount = (val: string) => {
+    const numVal = parseFloat(val);
+    return !isNaN(numVal) ? numVal.toString() : '0';
+  };
+
+  const [showQRScanner, setShowQRScanner] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#0d1129] to-[#10173a] pb-16">
+      {/* 顶部头像和背景 */}
+      <div className="relative w-full h-[220px] overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-[#10173a] to-[#0d1129] opacity-90 z-10"></div>
+        <div className="absolute inset-0 bg-[url('/images/grid-pattern.svg')] bg-repeat opacity-20 z-20 data-stream-bg"></div>
+        <div className="relative z-30 h-full flex flex-col justify-end p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center mb-2">
+                <Link href="/">
+                  <Button variant="ghost" size="sm" className="mr-2 text-white hover:bg-[#232853] button-secondary">
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    Back
+                  </Button>
+                </Link>
+              </div>
+              <h1 className="text-2xl font-bold text-white">
+                IntentPay
+              </h1>
+              <p className="text-[#8a8dbd] mt-1">Secure Web3 Payment System</p>
             </div>
-            <div className="flex relative">
-              <input
-                type="text"
-                id="recipient"
-                value={recipientAddress}
-                onChange={(e) => setRecipientAddress(e.target.value.replace(/^ethereum:/i, ''))}
-                placeholder="0x... or ENS name"
-                className="w-full p-3 border border-gray-700 bg-gray-800 rounded-xl focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-white text-sm font-mono pr-10"
-              />
-              {recipientAddress && (
-                <button
-                  type="button"
-                  onClick={clearAddress}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200"
-                  title="Clear address"
-                >
-                  <CircleX size={16} />
-                </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 主内容区域 */}
+      <div className="container max-w-lg mx-auto px-4 -mt-6">
+        <div className="bg-[#10173a] border border-[#2a3156] rounded-xl p-6 shadow-[0_0_20px_rgba(0,240,255,0.15)] card-hover neon-pulse">
+          {/* 交易表格 */}
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-white mb-4 bg-gradient-to-r from-[#00f0ff] to-[#05ffa1] bg-clip-text text-transparent neon-text">
+              Payment Details
+            </h2>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-[#8a8dbd]">Network</span>
+                <span className="text-white font-medium flex items-center">
+                  <span className="h-2 w-2 rounded-full bg-[#05ffa1] mr-2 animate-pulse"></span>
+                  Ethereum
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#8a8dbd]">Gas Fee</span>
+                <span className="text-white">{fee} USDC</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#8a8dbd]">Slippage</span>
+                <span className="text-white">{slippage}%</span>
+              </div>
+              
+              <div className="border-t border-[#2a3156] my-3 pt-3">
+                <div className="flex justify-between">
+                  <span className="text-[#c2c6ff] font-medium">Total Amount</span>
+                  <span className="text-white font-medium hologram-text">
+                    {amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0 
+                      ? (parseFloat(amount) + parseFloat(fee)).toFixed(4)
+                      : parseFloat(fee).toFixed(4)} USDC
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* 支付详情输入和当前代币 */}
+          <div className="space-y-6">
+            {/* 收款地址输入区域 */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label htmlFor="recipient-address" className="text-[#c2c6ff] text-sm font-medium neon-text">
+                  Recipient Address
+                </label>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 text-[#0074d9] hover:text-[#00a3e2] hover:bg-[#232853] px-2"
+                    onClick={() => setShowQRScanner(true)}
+                  >
+                    <ScanLine className="h-4 w-4 mr-1" />
+                    Scan
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 text-[#0074d9] hover:text-[#00a3e2] hover:bg-[#232853] px-2"
+                    onClick={handlePasteClipboard}
+                  >
+                    <Clipboard className="h-4 w-4 mr-1" />
+                    Paste
+                  </Button>
+                </div>
+              </div>
+              <div className="relative">
+                <Input
+                  id="recipient-address"
+                  type="text"
+                  placeholder="ethereum:0x..."
+                  value={recipientAddress}
+                  onChange={(e) => setRecipientAddress(e.target.value)}
+                  className={`bg-[#191d3e] border-[#2a3156] text-white focus:border-[#00f0ff] focus:ring-[#00f0ff] focus:ring-opacity-30 pr-10 input-focus ${!isValidAddress && recipientAddress ? "border-[#ff2a6d]" : ""}`}
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  {recipientAddress && (
+                    isValidAddress ? (
+                      <CheckCircle className="h-5 w-5 text-[#05ffa1]" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5 text-[#ff2a6d]" />
+                    )
+                  )}
+                </div>
+              </div>
+              {!isValidAddress && recipientAddress && (
+                <p className="text-[#ff2a6d] text-sm mt-1 pink-neon-text">Invalid Ethereum address</p>
               )}
             </div>
-            {recipientAddress && (
-              <div className="flex items-center gap-2 mt-1 px-2">
-                <Web3Avatar address={recipientAddress} size={20} />
-                <div className="text-xs text-gray-400 overflow-hidden overflow-ellipsis w-full">
-                  {recipientAddress}
-                </div>
-              </div>
-            )}
-          </div>
-          
-          {/* Amount Field - USDC Fixed */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-300">
-              You Pay
-            </label>
-            <div className="bg-gray-800 rounded-xl p-4">
-              <div className="flex justify-between items-center">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  pattern="[0-9]*\.?[0-9]*"
-                  value={amount}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    // Allow only numeric input with decimal point
-                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                      setAmount(value);
-                    }
-                  }}
-                  placeholder="0.0"
-                  className="w-full bg-transparent text-2xl font-semibold focus:outline-none"
-                />
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 cursor-default min-w-[90px] justify-center">
-                  {sourceTokenInfo?.logoURI && (
-                    <img 
-                      src={sourceTokenInfo.logoURI} 
-                      alt={sourceTokenInfo.symbol} 
-                      className="w-6 h-6 rounded-full"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/assets/tokens/default-token.svg';
-                      }}
-                    />
-                  )}
-                  <span className="font-medium">USDC</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Arrow Separator */}
-          <div className="flex justify-center -my-2">
-            <div className="bg-gray-800 p-2 rounded-full shadow-md border border-gray-700">
-              <ArrowDown className="h-5 w-5 text-blue-500" />
-            </div>
-          </div>
-          
-          {/* Receive Token Section */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label className="block text-sm font-medium text-gray-300">
-                Recipient Gets (Estimated)
+            
+            {/* 金额输入和代币选择 */}
+            <div className="space-y-2">
+              <label htmlFor="amount" className="text-[#c2c6ff] text-sm font-medium block neon-text">
+                Amount
               </label>
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  onClick={() => setShowChainSelector(true)}
-                  className="flex items-center space-x-1 text-xs text-gray-400 hover:text-white bg-gray-800 px-2 py-1 rounded-lg"
-                  title="Select destination chain"
-                >
-                  <span>{chainName}</span>
-                  <ChevronDown size={12} />
-                </button>
-              </div>
-            </div>
-            
-            <div className="bg-gray-800 rounded-xl p-4">
-              <div className="flex justify-between items-center">
-                <div className="text-2xl font-semibold">
-                  {estimatedReceived || '0.0'}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-grow">
+                  <Input
+                    id="amount"
+                    type="number"
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="bg-[#191d3e] border-[#2a3156] text-white focus:border-[#00f0ff] focus:ring-[#00f0ff] focus:ring-opacity-30 pr-16 input-focus"
+                  />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#8a8dbd]">
+                    USDC
+                  </div>
                 </div>
-                <button
-                  type="button"
+                <Button 
+                  type="button" 
                   onClick={() => setShowTokenSelector(true)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 transition-colors"
-                  title="Select token to receive"
+                  className="bg-[#232853] hover:bg-[#2a3156] text-[#c2c6ff] border border-[#2a3156] h-10 px-3 button-hover"
                 >
-                  {selectedToken ? (
-                    <>
-                      {selectedToken.logoURI && (
-                        <img 
-                          src={selectedToken.logoURI} 
-                          alt={selectedToken.symbol} 
-                          className="w-6 h-6 rounded-full"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/assets/tokens/default-token.svg';
-                          }}
-                        />
-                      )}
-                      <span className="font-medium">{selectedToken.symbol}</span>
-                    </>
-                  ) : (
-                    <span className="text-gray-400">Select token</span>
-                  )}
-                  <ChevronDown size={16} className="text-gray-400" />
-                </button>
+                  <ChevronsUpDown className="h-4 w-4 mr-1" />
+                  <span>Token</span>
+                </Button>
               </div>
-            </div>
-          </div>
-          
-          {/* Transaction Summary */}
-          <div className="bg-gray-800 p-4 rounded-xl space-y-3">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-400">Estimated Received</span>
-              <span className="font-medium">
-                {estimatedReceived} {selectedToken?.symbol}
-              </span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <div className="flex items-center">
-                <span className="text-gray-400">Network Fee</span>
-                <button 
-                  type="button"
-                  onClick={() => setShowSlippageSettings(true)}
-                  className="ml-1 text-gray-400 hover:text-blue-400"
-                  title="Adjust slippage settings"
-                >
-                  <Settings size={14} />
-                </button>
-              </div>
-              <span className="font-medium">
-                {fee} USDC ({(parseFloat(fee) / (parseFloat(amount) || 1) * 100).toFixed(2)}%)
-              </span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-400">Slippage Tolerance</span>
-              <span className="font-medium">{slippage}%</span>
             </div>
             
-            <div className="pt-2 mt-2 border-t border-gray-700">
-              <div className="flex items-start gap-2 text-xs text-gray-400">
-                <Info size={14} className="min-w-[14px] mt-0.5" />
-                <p>Your payment will be processed through the World App wallet without requiring additional gas fees.</p>
+            {/* 网络和交易设置 */}
+            <div className="flex gap-2">
+              <Button 
+                type="button" 
+                onClick={() => setShowChainSelector(true)} 
+                className="flex-1 bg-[#232853] hover:bg-[#2a3156] text-[#c2c6ff] border border-[#2a3156]"
+              >
+                <NetworkIcon chainId={selectedChainId} />
+                <span className="ml-2">{CHAIN_NAMES[selectedChainId] || 'Select Network'}</span>
+              </Button>
+              <Button 
+                type="button" 
+                onClick={() => setShowSlippageSettings(true)}
+                className="bg-[#232853] hover:bg-[#2a3156] text-[#c2c6ff] border border-[#2a3156] px-3"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Payment options - replacing the Pay Now button */}
+            <div className="grid grid-cols-2 gap-3">
+              <Button 
+                type="button" 
+                className="bg-[#0074d9] hover:bg-[#00a3e2] text-white font-medium py-5 transition-all duration-200"
+                onClick={() => {}}
+                disabled={!isValidAddress || !amount || parseFloat(amount) <= 0}
+              >
+                <Globe className="h-5 w-5 mr-2" />
+                Pay with World
+              </Button>
+              <div>
+                <ApplePayButton 
+                  amount={amount ? parseFloat(amount) : 0}
+                  label={`Pay ${amount || '0.00'} USDC`}
+                  onSuccess={() => {
+                    toast({
+                      title: "Payment Successful",
+                      description: "Your payment was processed successfully!",
+                      variant: "default",
+                    });
+                    
+                    // Reset form after successful payment
+                    setAmount('');
+                    setRecipientAddress('');
+                  }}
+                  onError={() => {
+                    toast({
+                      title: "Payment Failed",
+                      description: "There was an error processing your payment. Please try again.",
+                      variant: "destructive",
+                    });
+                  }}
+                />
               </div>
             </div>
           </div>
-          
-          {/* Submit Button */}
-          <Button 
-            type="submit" 
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl"
-            disabled={!recipientAddress || !amount || !selectedToken || parseFloat(amount) <= 0}
-          >
-            <Send size={18} />
-            Pay with World App
-          </Button>
-        </form>
+        </div>
       </div>
       
-      {/* Chain Selector Modal */}
+      {/* 网络选择器模态框 */}
       {showChainSelector && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-gray-900 rounded-2xl w-full max-w-md p-6 border border-gray-800 shadow-xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-white">Select Chain</h3>
-              <button 
-                type="button" 
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+          <div className="bg-[#191d3e] border border-[#2a3156] rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4 glass-effect">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xl font-semibold text-white">Select Network</h3>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0 text-[#8a8dbd] hover:text-white hover:bg-[#232853]"
                 onClick={() => setShowChainSelector(false)}
-                className="text-gray-400 hover:text-white"
-                title="Close chain selector"
               >
-                <CircleX size={20} />
-              </button>
+                <X className="h-5 w-5" />
+              </Button>
             </div>
-            <div className="space-y-1 max-h-60 overflow-y-auto">
-              {Object.entries(CHAIN_NAMES).map(([id, name]) => (
+            <div className="grid gap-2 custom-scrollbar cyberpunk-scrollable-container">
+              {Object.entries(SUPPORTED_CHAINS).map(([name, chainId]) => (
                 <button
-                  key={id}
+                  key={chainId}
                   type="button"
-                  onClick={() => handleChainSelect(id)}
-                  className={`w-full p-3 flex items-center rounded-xl ${
-                    selectedChainId === id ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30' : 'hover:bg-gray-800 border border-transparent'
+                  className={`flex items-center justify-between p-3 rounded-lg text-left transition-all ${
+                    selectedChainId === parseInt(chainId)
+                      ? 'bg-[#0074d9]/20 border border-[#0074d9]'
+                      : 'bg-[#232853] border border-[#2a3156] hover:border-[#0074d9]'
                   }`}
+                  onClick={() => {
+                    setSelectedChainId(parseInt(chainId));
+                    setShowChainSelector(false);
+                  }}
                 >
-                  <span>{name}</span>
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-[#232853] flex items-center justify-center mr-3 overflow-hidden">
+                      <Image
+                        src={`/assets/chains/${name.toLowerCase()}.svg`}
+                        width={24}
+                        height={24}
+                        alt={name}
+                        className="h-6 w-6 object-contain"
+                      />
+                    </div>
+                    <span className="text-white font-medium">{name}</span>
+                  </div>
+                  {selectedChainId === parseInt(chainId) && (
+                    <Check className="h-5 w-5 text-[#0074d9]" />
+                  )}
                 </button>
               ))}
             </div>
@@ -545,147 +664,193 @@ function IntentPayContent() {
         </div>
       )}
       
-      {/* Token Selector Modal */}
+      {/* 代币选择模态框 */}
       {showTokenSelector && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-gray-900 rounded-2xl w-full max-w-md p-6 border border-gray-800 shadow-xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-white">Select Token</h3>
-              <button 
-                type="button" 
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+          <div className="bg-[#191d3e] border border-[#2a3156] rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4 glass-effect max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xl font-semibold text-white">Select Token</h3>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0 text-[#8a8dbd] hover:text-white hover:bg-[#232853]"
                 onClick={() => setShowTokenSelector(false)}
-                className="text-gray-400 hover:text-white"
-                title="Close token selector"
               >
-                <CircleX size={20} />
-              </button>
+                <X className="h-5 w-5" />
+              </Button>
             </div>
-            
-            {/* Search input */}
-            <div className="flex items-center border border-gray-700 rounded-xl p-2 mb-4 bg-gray-800">
-              <Search size={18} className="text-gray-400 mx-2" />
-              <input
+            <div className="relative mb-4">
+              <Input
                 type="text"
-                placeholder="Search by name or address"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="w-full bg-transparent focus:outline-none text-white"
+                placeholder="Search tokens..."
+                value={tokenSearchQuery}
+                onChange={(e) => {
+                  setTokenSearchQuery(e.target.value);
+                  handleTokenSearch(e.target.value);
+                }}
+                className="bg-[#232853] border-[#2a3156] text-white focus:border-[#0074d9] focus:ring-[#0074d9] focus:ring-opacity-30"
               />
+              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#8a8dbd]" />
             </div>
-            
-            {/* Token list */}
-            <div className="space-y-1 max-h-[300px] overflow-y-auto">
-              {isLoadingTokens ? (
-                <div className="flex justify-center items-center py-8">
-                  <Loader2 size={24} className="animate-spin text-blue-400" />
-                </div>
-              ) : filteredTokens.length > 0 ? (
-                filteredTokens.map((token) => (
-                  <button
-                    key={token.address}
-                    type="button"
-                    onClick={() => handleTokenSelect(token)}
-                    className={`w-full p-3 flex items-center justify-between rounded-xl ${
-                      selectedToken?.address === token.address 
-                        ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30' 
-                        : 'hover:bg-gray-800 border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center">
-                      {token.logoURI && (
-                        <img 
-                          src={token.logoURI} 
-                          alt={token.symbol} 
-                          className="w-8 h-8 mr-3 rounded-full"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/assets/tokens/default-token.svg';
-                          }}
-                        />
-                      )}
-                      <div className="text-left">
-                        <div className="font-medium text-white">{token.symbol}</div>
-                        <div className="text-xs text-gray-400">{token.name}</div>
+            <div className="token-selector-area custom-scrollbar">
+              <div className="space-y-2">
+                {tokenSearch.loading ? (
+                  <div className="py-10 flex flex-col items-center justify-center text-[#8a8dbd]">
+                    <Loader className="h-10 w-10 animate-spin mb-2" />
+                    <p>Searching tokens...</p>
+                  </div>
+                ) : tokenSearch.results.length > 0 ? (
+                  tokenSearch.results.map((token) => (
+                    <button
+                      key={token.address}
+                      type="button"
+                      className={`flex items-center justify-between w-full p-3 rounded-lg text-left transition-all ${
+                        isSelectedToken(token.address) 
+                          ? 'bg-[#0074d9]/20 border border-[#0074d9]'
+                          : 'bg-[#232853] border border-[#2a3156] hover:border-[#0074d9]'
+                      }`}
+                      onClick={() => handleTokenSelect(token)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-[#30365c] flex items-center justify-center overflow-hidden">
+                          {token.logoURI ? (
+                            <img src={token.logoURI} alt={token.symbol} className="h-full w-full object-contain" />
+                          ) : (
+                            <DollarSign className="h-4 w-4 text-[#c2c6ff]" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium text-white">{token.symbol}</div>
+                          <div className="text-xs text-[#8a8dbd]">{token.name}</div>
+                        </div>
                       </div>
-                    </div>
-                    {selectedToken?.address === token.address && (
-                      <Check size={18} className="text-blue-400" />
-                    )}
-                  </button>
-                ))
-              ) : (
-                <div className="text-center py-8 text-gray-400">
-                  No tokens found
-                </div>
-              )}
+                      {isSelectedToken(token.address) && (
+                        <Check className="h-5 w-5 text-[#0074d9]" />
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <div className="py-10 flex flex-col items-center justify-center text-[#8a8dbd]">
+                    <Search className="h-10 w-10 mb-2" />
+                    <p>No tokens found</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
       
-      {/* Slippage Settings Modal */}
+      {/* 滑点设置模态框 */}
       {showSlippageSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-gray-900 rounded-2xl w-full max-w-md p-6 border border-gray-800 shadow-xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-white">Slippage Settings</h3>
-              <button 
-                type="button" 
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+          <div className="bg-[#191d3e] border border-[#2a3156] rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4 glass-effect">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xl font-semibold text-white neon-text">Transaction Settings</h3>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0 text-[#8a8dbd] hover:text-white hover:bg-[#232853] button-hover"
                 onClick={() => setShowSlippageSettings(false)}
-                className="text-gray-400 hover:text-white"
-                title="Close slippage settings"
               >
-                <CircleX size={20} />
-              </button>
+                <X className="h-5 w-5" />
+              </Button>
             </div>
             <div className="space-y-4">
-              <div className="flex justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleSlippageChange(0.1)}
-                  className={`flex-1 p-3 rounded-xl border ${
-                    slippage === 0.1 
-                      ? 'bg-blue-600/20 text-blue-400 border-blue-600/30' 
-                      : 'border-gray-700 text-gray-300 hover:bg-gray-800'
-                  }`}
-                >
-                  0.1%
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSlippageChange(0.5)}
-                  className={`flex-1 p-3 rounded-xl border ${
-                    slippage === 0.5 
-                      ? 'bg-blue-600/20 text-blue-400 border-blue-600/30' 
-                      : 'border-gray-700 text-gray-300 hover:bg-gray-800'
-                  }`}
-                >
-                  0.5%
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSlippageChange(1.0)}
-                  className={`flex-1 p-3 rounded-xl border ${
-                    slippage === 1.0 
-                      ? 'bg-blue-600/20 text-blue-400 border-blue-600/30' 
-                      : 'border-gray-700 text-gray-300 hover:bg-gray-800'
-                  }`}
-                >
-                  1.0%
-                </button>
+              <div>
+                <label className="text-[#c2c6ff] font-medium block mb-2 neon-text">Slippage Tolerance</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[0.1, 0.5, 1.0, 5.0].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`rounded-md p-2 text-center ${
+                        slippage === value
+                          ? 'bg-gradient-to-r from-[#00f0ff] to-[#05ffa1] text-[#080f36] font-medium'
+                          : 'bg-[#10173a] border border-[#2a3156] text-[#c2c6ff]'
+                      } button-hover`}
+                      onClick={() => setSlippage(value)}
+                    >
+                      {value}%
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4">
+                  <label className="text-[#c2c6ff] font-medium block mb-2 neon-text">Custom Slippage</label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      max="100"
+                      value={slippage}
+                      onChange={(e) => setSlippage(parseFloat(e.target.value) || 0.5)}
+                      className="bg-[#10173a] border-[#2a3156] text-white focus:border-[#00f0ff] focus:ring-[#00f0ff] focus:ring-opacity-30 pr-10 input-focus"
+                    />
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#8a8dbd]">
+                      %
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="text-sm text-gray-400 mt-2">
-                Your transaction will revert if the price changes by more than this percentage.
+              
+              <div>
+                <label className="text-[#c2c6ff] font-medium block mb-2 neon-text">Transaction Fee</label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={fee}
+                    onChange={(e) => setFee(e.target.value)}
+                    className="bg-[#10173a] border-[#2a3156] text-white focus:border-[#00f0ff] focus:ring-[#00f0ff] focus:ring-opacity-30 pr-14 input-focus"
+                  />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#8a8dbd]">
+                    USDC
+                  </div>
+                </div>
               </div>
             </div>
+            <Button 
+              type="button" 
+              className="w-full bg-gradient-to-r from-[#00f0ff] to-[#05ffa1] hover:opacity-90 text-[#080f36] font-medium transition-all duration-200 mt-4 button-hover"
+              onClick={() => setShowSlippageSettings(false)}
+            >
+              Confirm Settings
+            </Button>
           </div>
         </div>
       )}
-      
-      {/* QR Scanner Modal */}
+
+      {/* QR扫描模态框 */}
       {showQRScanner && (
-        <QRScannerModal
+        <QRScannerModal 
           onClose={() => setShowQRScanner(false)}
-          onResult={handleQRResult}
+          onResult={(result: string) => {
+            // Handle ETH address format
+            if (result) {
+              // Extract Ethereum address from various formats
+              // ethereum:0x... format
+              if (result.startsWith('ethereum:')) {
+                setRecipientAddress(result.replace('ethereum:', ''));
+              } else if (result.match(/^0x[a-fA-F0-9]{40}$/)) {
+                // Direct address format
+                setRecipientAddress(result);
+              } else {
+                // Try to extract address from other formats
+                const addressMatch = result.match(/0x[a-fA-F0-9]{40}/);
+                if (addressMatch) {
+                  setRecipientAddress(addressMatch[0]);
+                } else {
+                  toast({
+                    title: "Invalid QR Code",
+                    description: "The scanned QR code doesn't contain a valid Ethereum address.",
+                    variant: "destructive",
+                  });
+                }
+              }
+            }
+          }}
         />
       )}
     </div>
@@ -706,7 +871,7 @@ export default function IntentPayPage() {
       `}</style>
       <Suspense fallback={
         <div className="flex justify-center items-center min-h-[60vh]">
-          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+          <div className="animate-spin h-8 w-8 border-4 border-[#00f0ff] border-t-transparent rounded-full"></div>
         </div>
       }>
         <IntentPayContent />

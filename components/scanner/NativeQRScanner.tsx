@@ -212,7 +212,7 @@ export default function NativeQRScanner({ onScan, onClose }: NativeQRScannerProp
                   size="sm"
                   variant="outline"
                   className="bg-emerald-900/30 text-white border-emerald-500/30 hover:bg-emerald-800/50"
-                  onClick={() => mockScan('0x71C7656EC7ab88b098defB751B7401B5f6d8976F')}
+                  onClick={() => mockScan('0x67aad1351bb0665d2a560a52bef9ab8621567d25')}
                 >
                   Test Address 1
                 </Button>
@@ -220,7 +220,7 @@ export default function NativeQRScanner({ onScan, onClose }: NativeQRScannerProp
                   size="sm"
                   variant="outline"
                   className="bg-emerald-900/30 text-white border-emerald-500/30 hover:bg-emerald-800/50"
-                  onClick={() => mockScan('0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc')}
+                  onClick={() => mockScan('0x67aad1351bb0665d2a560a52bef9ab8621567d25')}
                 >
                   Test Address 2
                 </Button>

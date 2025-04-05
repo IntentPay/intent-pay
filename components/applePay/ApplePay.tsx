@@ -3,11 +3,18 @@
 import { useEffect } from 'react';
 
 interface ApplePayButtonProps {
-  amount: string; // 傳入的金額
-  label: string; // 註明
+  amount: string | number; // 傳入的金額
+  label?: string; // 註明
+  onSuccess?: () => void; // Add success callback
+  onError?: () => void; // Add error callback
 }
 
-const ApplePayButton: React.FC<ApplePayButtonProps> = ({ amount, label }) => {
+const ApplePayButton: React.FC<ApplePayButtonProps> = ({ 
+  amount, 
+  label = 'Demo (Card is not charged)',
+  onSuccess,
+  onError
+}) => {
   // 在頁面載入時加載 Apple Pay SDK
   useEffect(() => {
     const script = document.createElement('script');
@@ -26,6 +33,7 @@ const ApplePayButton: React.FC<ApplePayButtonProps> = ({ amount, label }) => {
     // 確保 PaymentRequest 可用
     if (!window.PaymentRequest) {
       console.error('Apple Pay is not supported in this browser.');
+      onError?.(); // Call error callback if provided
       return;
     }
 
@@ -47,10 +55,10 @@ const ApplePayButton: React.FC<ApplePayButtonProps> = ({ amount, label }) => {
       // 定義 PaymentDetails
       const paymentDetails = {
         total: {
-          label: label || 'Demo (Card is not charged)',
+          label: label,
           amount: {
-            value: amount,
-            currency: 'USD'
+            currency: 'USD',
+            value: typeof amount === 'string' ? amount : amount.toString()
           }
         }
       };
@@ -90,9 +98,11 @@ const ApplePayButton: React.FC<ApplePayButtonProps> = ({ amount, label }) => {
       const response = await request.show();
       const status = 'success';
       await response.complete(status);
-    } catch (e) {
-      // 處理錯誤
-      console.error('Apple Pay Error:', e);
+      console.log('Apple Pay payment successful', response);
+      onSuccess?.(); // Call success callback if provided
+    } catch (error) {
+      console.error('Apple Pay payment failed', error);
+      onError?.(); // Call error callback if provided
     }
   };
 

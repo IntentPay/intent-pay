@@ -43,7 +43,7 @@ export default function WalletHomePage() {
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   // Mockup wallet data (for development)
-  const walletAddress = user?.address || '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
+  const walletAddress = user?.address || '0x67aad1351bb0665d2a560a52bef9ab8621567d25';
   const usdcBalance = walletBalance !== null ? walletBalance : 1250.75;
   const transactions = [
     { id: 1, type: 'receive', amount: '+120 USDC', date: '2025-04-03', from: '0x1234...5678', status: 'completed' },
@@ -157,7 +157,7 @@ export default function WalletHomePage() {
       </div>
 
       {/* Action Buttons */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 text-black">
         <Button variant="outline" className="flex flex-col h-16 items-center justify-center">
           <Plus className="h-4 w-4 mb-1" />
           <span className="text-xs">Add USDC</span>
