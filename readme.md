@@ -1,7 +1,7 @@
 # IntentPay
 
 [](https://github.com/IntentPay/intent-pay/tree/develop-world/assets/IntentPay_banner.png)
-**IntentPay** is a gasless wallet Mini App built on the **World App** platform that enables seamless USDC transfers and intent-based trading. Powered by Circle's Modular wallet technology and 1inch's API, users can execute transactions without worrying about gas fees while being verified as unique humans through World ID.
+**IntentPay** is a gasless wallet Mini App built on the **World App** platform that enables seamless USDC-priced, cross-chain transactions and intent-based trading. Powered by Circle's Modular wallet technology and 1inch's API, users can execute transactions through World App payments without worrying about gas fees while being verified as unique humans through World ID.
 
 ## Vision
 
@@ -9,13 +9,16 @@
 
 - **Circle's Modular Wallet** for secure, non-custodial wallet infrastructure
 - **1inch API** for optimal trading and liquidity aggregation
-- **World ID verification** via MiniKit for Sybil-resistance and human verification
+- **World ID verification and World App payments** for Sybil-resistance, human verification, and seamless payments
 
-We create a seamless financial experience that removes the complexity of gas fees while ensuring security and efficiency for all users.
+We create a frictionless financial experience that removes the complexity of gas fees and wallet management while ensuring security and efficiency for all users.
 
 ## Core Features
 
-- **Gasless Transactions**: Execute transfers without managing gas fees
+- **USDC-Priced Cross-Chain Swaps**: All transactions priced in USDC regardless of destination chain or token
+- **World App Payment Integration**: Pay for swaps directly through World App without connecting personal wallets
+- **QR Code Address Scanning**: Easily input recipient addresses by scanning QR codes
+- **Gasless Transactions**: Execute transfers without managing gas fees using IntentPay's official Circle wallet
 - **Intent-Based Trading**: Submit trade intentions that get executed optimally via 1inch
 - **Human Verification**: Privacy-preserving verification using World ID and zero-knowledge proofs
 - **Multi-chain Support**: Transact across multiple blockchains seamlessly
@@ -28,7 +31,8 @@ We create a seamless financial experience that removes the complexity of gas fee
 - **Styling**: TailwindCSS with shadcn/ui components
 - **Wallet Infrastructure**: Circle Modular wallet technology
 - **Trading System**: 1inch API for optimized intent execution
-- **Identity Verification**: World ID via MiniKit SDK
+- **Identity & Payments**: World ID via MiniKit SDK and World App payment processing
+- **QR Scanning**: Camera integration for address input
 - **State Management**: React Context and custom hooks
 
 ## Project Structure
@@ -49,11 +53,14 @@ intent-pay/
 ├── components/                  # Reusable UI components
 │   ├── ui/                      # Base UI components (shadcn/ui)
 │   ├── wallet/                  # Wallet-specific components
+│   ├── swap/                    # Swap form components
+│   ├── scanner/                 # QR code scanner components
 │   └── trading/                 # Trading-specific components
 ├── lib/                         # Utility functions and services
 │   ├── circle/                  # Circle wallet integration
 │   ├── oneinch/                 # 1inch API integration
 │   ├── worldid/                 # World ID integration
+│   ├── payment/                 # World App payment integration
 │   └── utils/                   # Shared utilities
 ├── public/                      # Static assets
 └── config files                 # Configuration files
@@ -83,7 +90,7 @@ intent-pay/
 
 3. **Set up environment variables**:
 
-   - Copy `.env.local.example` to `.env.local`
+   - Copy `.env.example` to `.env.local`
    - Add necessary API keys for Circle, 1inch, and World Mini App
 
 4. **Run the development server**:
@@ -112,11 +119,12 @@ intent-pay/
 - **Gas Optimization**: Efficient execution path finding
 - **MEV Protection**: Shield transactions from front-running
 
-### World ID
+### World ID and World App Payments
 
 - **Sybil Resistance**: Verify unique humans via World ID
 - **MiniKit Integration**: Streamlined integration with World App
 - **Privacy-Preserving**: Zero-knowledge proof verification
+- **Integrated Payments**: Process payments directly through World App
 
 ## Team Collaboration Guidelines
 
@@ -173,6 +181,8 @@ intent-pay/
    - Portfolio tracking
 
 3. **Phase 3: Enhanced Features**
+   - World App payment integration
+   - QR code scanning for addresses
    - Multi-chain support expansion
    - Advanced security features
    - Performance optimizations

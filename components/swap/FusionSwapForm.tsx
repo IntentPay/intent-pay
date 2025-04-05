@@ -20,7 +20,7 @@ export function FusionSwapForm() {
   const [quoteData, setQuoteData] = useState<any>(null);
   const [crossChainQuoteData, setCrossChainQuoteData] = useState<any>(null);
   const [result, setResult] = useState<any>(null);
-  const [fee, setFee] = useState<string>('0');
+  const [fee, setFee] = useState<string>('50'); // Default to 0.5% (50 basis points)
   
   // Token selection states
   const [tokenList, setTokenList] = useState<TokenInfoDto[]>([]);
@@ -319,15 +319,17 @@ export function FusionSwapForm() {
             <label className="block text-sm font-medium mb-1 text-gray-400">Fee (basis points - 1 bp = 0.01%)</label>
             <input
               type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
               min="0"
               max="1000"
               className="w-full px-3 py-2 border border-gray-700 bg-gray-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-white"
               value={fee}
               onChange={(e) => setFee(e.target.value)}
-              placeholder="0"
+              placeholder="50"
             />
             <div className="text-xs text-gray-400 mt-1">
-              Current fee: {parseInt(fee) / 100}%
+              Current fee: {parseInt(fee) / 100}% (Recommended: 0.5%)
             </div>
           </div>
         )}
@@ -341,6 +343,8 @@ export function FusionSwapForm() {
             <div className="flex-1">
               <input
                 type="text"
+                inputMode="decimal"
+                pattern="[0-9]*\.?[0-9]*"
                 className="w-full bg-transparent text-2xl font-semibold focus:outline-none"
                 value={amount}
                 onChange={(e) => {
@@ -440,7 +444,9 @@ export function FusionSwapForm() {
           <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
             <div className="bg-gray-900 rounded-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
               <div className="p-4 border-b border-gray-800 flex justify-between items-center">
-                <h3 className="text-lg font-bold">Select Token</h3>
+                <h3 className="text-lg font-bold">
+                  Select Token on {CHAIN_NAMES[(isCrossChain ? destinationChainId : sourceChainId).toString() as keyof typeof CHAIN_NAMES]}
+                </h3>
                 <button 
                   className="text-gray-400 hover:text-white"
                   onClick={() => setShowToTokenSelector(false)}
@@ -460,6 +466,11 @@ export function FusionSwapForm() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
+                </div>
+                
+                {/* Chain indicator */}
+                <div className="mb-3 px-2 py-1 bg-blue-900/30 text-blue-300 rounded-lg inline-block text-xs">
+                  Showing tokens for {CHAIN_NAMES[(isCrossChain ? destinationChainId : sourceChainId).toString() as keyof typeof CHAIN_NAMES]}
                 </div>
                 
                 {/* Common tokens */}

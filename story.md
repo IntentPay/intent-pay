@@ -1,60 +1,88 @@
-# IntentPay: Universal DeFi Access with USDC
-   
-**IntentPay** is a revolutionary gasless wallet Mini App built on the **World App** platform that enables seamless cross-chain USDC transactions and intent-based trading. By combining Circle's Modular wallet technology and 1inch's advanced trading infrastructure, users can execute transactions without worrying about gas fees while being verified as unique humans through World ID.
+# IntentPay: Universal DeFi Access Without a Wallet
 
-## Vision
+**IntentPay** is a revolutionary platform built on the **World App** ecosystem that enables seamless cross-chain transactions without requiring users to create or manage their own crypto wallets. By combining World ID verification, Circle's Modular wallet technology, and 1inch's advanced trading infrastructure, we've created a frictionless crypto experience accessible to everyone.
 
-IntentPay transforms the crypto experience by providing a unified platform where users can **buy and participate in any token and DeFi protocol with USDC**. Our dual integration approach creates a seamless multi-chain financial ecosystem:
 
-- **Circle Stream**: Leveraging Modular Wallet for secure non-custodial infrastructure on Arbitrum, Smart Contract Accounts (SCA) for programmable transactions, and CCTP v2 for cross-chain transfers across Ethereum, Base, and Avalanche
+## Our Two-Pronged Approach
 
-- **1inch Stream**: Utilizing Fusion for gasless swaps, Class Swap for cross-chain trading, Dev Portal APIs for deep liquidity access, and Portfolio Tracking for comprehensive asset management
 
-This dual-stream approach allows users to move seamlessly between chains, swap tokens efficiently, and participate in DeFi - all with the simplicity of USDC and no gas fee management.
+### 1. Intent Pay - Walletless Token Swaps
 
-## Core Features
+Intent Pay allows users who have completed World App's Orb verification to directly swap tokens without creating or funding a wallet first. Here's how it works:
 
-- **Universal DeFi Gateway**: Access any token or protocol across supported chains using just USDC
-- **Gasless Transactions**: Execute transfers and trades without managing gas fees
-- **Cross-Chain Fluidity**: Seamlessly move assets between Ethereum, Arbitrum, Base, and Avalanche
-- **Intent-Based Trading**: Submit trade intentions that get executed optimally via 1inch Fusion
-- **Human Verification**: Privacy-preserving verification using World ID's zero-knowledge proofs
-- **Enhanced Security**: Passkey authentication and risk-based transaction screening
-- **Comprehensive Portfolio**: Track assets, transactions, and performance across all integrated chains
+- **Instant Access**: After World ID verification, users can immediately start trading
+- **Simple Payment**: Pay with WLD or USDC.e directly through World App
+- **Flexible Destination**: Enter recipient address manually or scan a QR code
+- **Multi-Chain Support**: Select any destination chain and token
+- **Transparent Pricing**: View estimated amounts and fees before confirming
+- **Hassle-Free Execution**: Our platform-owned Circle wallet executes the 1inch swap after payment
+
+Users can acquire any token on any supported chain without understanding blockchain complexities, gas fees, or wallet management. It's as simple as selecting what you want and paying through World App.
+
+
+### 2. Intent Wallet - Your Personal DeFi Gateway
+
+Intent Wallet leverages World ID verification to create personal non-custodial wallets for users who want more capabilities:
+
+- **Seamless Creation**: World ID's nullifier_hash serves as the unique identifier for your Circle Modular wallet
+- **Full Functionality**: Transfer, swap, receive funds, and participate in DeFi protocols
+- **USDC-Focused**: Fund your wallet with USDC via transfers or World App payments
+- **Gas-Free Operations**: No need to hold specific gas tokens for different chains
+
+Intent Wallet provides all the functionality of a traditional crypto wallet with significantly improved user experience, requiring only USDC to participate in the entire DeFi ecosystem.
+
 
 ## Technical Architecture
 
+
+### World App Integration
+
+- **World ID Verification**: Sybil-resistant verification ensures every user is a unique human
+- **MiniKit Integration**: Seamless integration within the World App ecosystem
+- **Direct Payment Processing**: Process WLD and USDC.e payments within the familiar World App interface
+
+
 ### Circle Integration
-- **Modular Wallet**: Non-custodial wallet infrastructure on Arbitrum
-- **Smart Contract Accounts (SCA)**: Programmable transaction infrastructure
-- **CCTP v2**: Cross-chain transfer protocol connecting Ethereum, Base, and Avalanche
-- **Transaction Sponsorship**: Enable gasless transactions for improved UX
+
+- **Modular Wallet Infrastructure**: Powers both platform wallets (for Intent Pay) and user wallets (for Intent Wallet)
+- **Passkey Authentication**: Secure wallet access using World ID verification
+- **Transaction Execution**: Handle cross-chain operations without requiring user-managed gas
+
 
 ### 1inch Integration
-- **Fusion**: Gasless trading with MEV protection
-- **Class Swap**: Cross-chain token exchange capabilities
-- **Dev Portal APIs**: Access to deep liquidity and optimized trading paths
-- **Portfolio Tracking**: Comprehensive asset tracking across chains
 
-### World App Platform
-- **Mini App Framework**: Fast and responsive UI within World App
-- **World ID**: Sybil-resistant verification of unique humans
-- **MiniKit SDK**: Streamlined integration with the World ecosystem
+- **Fusion Protocol**: Gasless trading with MEV protection
+- **Cross-Chain Swaps**: Execute trades across multiple blockchain networks
+- **Deep Liquidity Access**: Optimal price execution through aggregated liquidity sources
 
-## User Journey
 
-1. **Onboarding**: User authenticates with World ID, verifying their humanity
-2. **Wallet Creation**: CircleModular creates a non-custodial wallet with passkey authentication
-3. **Funding**: User deposits USDC via supported on-ramps
-4. **DeFi Access**:
-    - Send USDC cross-chain via CCTP v2
-    - Swap USDC for any token via 1inch Fusion
-    - Participate in DeFi protocols across multiple chains
-    - Monitor portfolio performance with 1inch tracking tools
-5. **Gasless Experience**: All transactions executed without user managing gas fees
+## User Journeys
 
-## The IntentPay Advantage
 
-By combining Circle's infrastructure for secure asset management and cross-chain capabilities with 1inch's advanced trading and liquidity solutions, IntentPay creates a unique platform that abstracts away blockchain complexity. Users focus on what they want to achieve (their intent) rather than how to achieve it (gas, chains, protocols).
+### Intent Pay Journey
 
-Our vision is to make DeFi participation as simple as traditional finance, with USDC serving as the universal medium of exchange across the entire crypto ecosystem - all within the familiar and secure World App environment.
+1. Complete World ID Orb verification
+2. Select destination chain and token
+3. Enter recipient address (manually or via QR code)
+4. View estimated amounts and fees
+5. Pay with WLD or USDC.e through World App
+6. Receive confirmation when swap is complete
+
+
+### Intent Wallet Journey
+
+1. Complete World ID Orb verification
+2. Wallet is automatically created using nullifier_hash
+3. Fund wallet with USDC (via transfer or World App)
+4. Use wallet for transfers, swaps, and DeFi participation
+5. Manage all assets without worrying about gas tokens
+
+
+## The IntentPay Vision
+
+Our mission is to remove the technical barriers that prevent mainstream adoption of decentralized finance. By combining World App's human verification, Circle's wallet infrastructure, and 1inch's trading solutions, we've created an ecosystem where users can:
+
+- **Buy any token on any chain with WLD/USDC.e without creating a wallet**
+- **Access any DeFi protocol using only USDC, without worrying about gas tokens**
+
+IntentPay transforms the complexity of cross-chain DeFi into a simple, accessible experience for everyone.

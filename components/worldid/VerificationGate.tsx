@@ -7,15 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Shield, AlertTriangle, Check, Bug, RotateCcw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useMiniKit } from '@/lib/minikit-provider';
 
 interface VerificationGateProps {
   children: ReactNode;
 }
 
 export function VerificationGate({ children }: VerificationGateProps) {
-  const { error } = useWorldID();
+  const { error: worldIdError } = useWorldID();
+  const { isWorldApp, isReady, error: minikitError, forceDevelopmentMode } = useMiniKit();
   const [isVerified, setIsVerified] = useState(false);
-  const [isWorldApp, setIsWorldApp] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [debugInfo, setDebugInfo] = useState('No debug info yet');
   const [userDebugInfo, setUserDebugInfo] = useState<string | null>(null);
@@ -32,6 +33,9 @@ export function VerificationGate({ children }: VerificationGateProps) {
           
           // Check if MiniKit exists in window object
           debugMessage += 'MiniKit exists: ' + ('MiniKit' in window) + '\n';
+          debugMessage += 'MiniKit provider isWorldApp: ' + isWorldApp + '\n';
+          debugMessage += 'MiniKit provider isReady: ' + isReady + '\n';
+          debugMessage += 'MiniKit provider error: ' + (minikitError || 'none') + '\n';
           
           if ('MiniKit' in window) {
             debugMessage += 'MiniKit.isInstalled exists: ' + (typeof (window as any).MiniKit.isInstalled === 'function') + '\n';
@@ -40,7 +44,6 @@ export function VerificationGate({ children }: VerificationGateProps) {
               try {
                 const isInstalled = MiniKit.isInstalled();
                 debugMessage += 'MiniKit.isInstalled(): ' + isInstalled + '\n';
-                setIsWorldApp(isInstalled);
               } catch (error: any) {
                 debugMessage += 'Error calling MiniKit.isInstalled(): ' + (error?.message || String(error)) + '\n';
               }
@@ -74,20 +77,11 @@ export function VerificationGate({ children }: VerificationGateProps) {
           }
           
           setDebugInfo(debugMessage);
-          
-          // Try detection via User-Agent
-          const userAgent = navigator.userAgent || '';
-          const isWorldAppUserAgent = userAgent.includes('WorldApp') || userAgent.includes('World App');
-          if (isWorldAppUserAgent) {
-            console.log('📱 Detected World App via User-Agent');
-            setIsWorldApp(true);
-          }
         }
       } catch (error: any) {
         const errorMessage = '❌ Error checking MiniKit: ' + (error?.message || String(error));
         console.error(errorMessage);
         setDebugInfo(prev => prev + '\n' + errorMessage);
-        setIsWorldApp(false);
       }
     };
 
@@ -115,7 +109,7 @@ export function VerificationGate({ children }: VerificationGateProps) {
     // Run checks
     checkMiniKit();
     checkVerificationStatus();
-  }, []);
+  }, [isWorldApp, isReady, minikitError]);
 
   const verifyPayload: VerifyCommandInput = {
     action: 'intent', // This is your action ID from the Developer Portal
@@ -126,6 +120,22 @@ export function VerificationGate({ children }: VerificationGateProps) {
     try {
       setIsVerifying(true);
       console.log('🔐 Attempting to verify user ID');
+      
+      // Use the MiniKit context to check if we're in World App
+      if (!isWorldApp) {
+        console.error('❌ Not running inside World App, but verify was called');
+        setDebugInfo(prev => prev + '\nAttempted verification outside World App');
+        
+        toast({
+          title: "Not in World App",
+          description: "You're not currently in the World App. Please use Test Mode instead.",
+          variant: "destructive",
+          duration: 3000,
+        });
+        
+        setIsVerifying(false);
+        return;
+      }
       
       try {
         // Try directly calling MiniKit.commandsAsync.verify
@@ -354,10 +364,11 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
   };
 
   const forceWorldApp = () => {
-    setIsWorldApp(true);
+    // Call the forceDevelopmentMode from MiniKit context instead
+    forceDevelopmentMode();
     toast({
-      title: "World App mode forced",
-      description: "Now you can try clicking the verification button",
+      title: "Development mode forced",
+      description: "You can now test the app without World App verification",
       variant: "default",
       duration: 3000,
     });
@@ -370,6 +381,9 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
         
         // Check if MiniKit exists in window object
         debugMessage += 'MiniKit exists: ' + ('MiniKit' in window) + '\n';
+        debugMessage += 'MiniKit provider isWorldApp: ' + isWorldApp + '\n';
+        debugMessage += 'MiniKit provider isReady: ' + isReady + '\n';
+        debugMessage += 'MiniKit provider error: ' + (minikitError || 'none') + '\n';
         
         if ('MiniKit' in window) {
           debugMessage += 'MiniKit.isInstalled exists: ' + (typeof (window as any).MiniKit.isInstalled === 'function') + '\n';
@@ -378,7 +392,7 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
             try {
               const isInstalled = MiniKit.isInstalled();
               debugMessage += 'MiniKit.isInstalled(): ' + isInstalled + '\n';
-              setIsWorldApp(isInstalled);
+              // Removed setIsWorldApp since we're now using context
             } catch (error: any) {
               debugMessage += 'Error calling MiniKit.isInstalled(): ' + (error?.message || String(error)) + '\n';
             }
@@ -396,10 +410,7 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
         const isWorldAppUserAgent = userAgent.includes('WorldApp') || userAgent.includes('World App');
         debugMessage += 'Detected World App via User-Agent: ' + isWorldAppUserAgent + '\n';
         
-        if (isWorldAppUserAgent) {
-          console.log('📱 Detected World App via User-Agent');
-          setIsWorldApp(true);
-        }
+        // Removed setIsWorldApp call - we're now using the context
         
         setDebugInfo(debugMessage);
         
@@ -431,7 +442,7 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
         {/* Render children, but first check if we have debug info to display */}
         {userDebugInfo && (
           <div className="fixed bottom-4 right-4 z-50">
-            <Button 
+            {/* <Button 
               variant="outline" 
               className="mb-2"
               onClick={() => {
@@ -449,8 +460,8 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
               }}
             >
               <Bug className="h-4 w-4 mr-2" />
-              Show World ID Debug
-            </Button>
+              Show World ID 
+            </Button> */}
           </div>
         )}
         {children}
@@ -472,10 +483,10 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
           <CardDescription>Please verify with World ID to access IntentPay</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {error && (
+          {worldIdError && (
             <div className="bg-red-50 text-red-700 p-3 rounded-md flex items-center">
               <AlertTriangle className="w-5 h-5 mr-2 flex-shrink-0" />
-              <p className="text-sm">{error}</p>
+              <p className="text-sm">{worldIdError}</p>
             </div>
           )}
 
@@ -570,6 +581,14 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
               <p className="text-xs mt-1">
                 You can use Test Mode to bypass verification completely.
               </p>
+              <Button 
+                onClick={forceDevelopmentMode} 
+                variant="outline" 
+                size="sm"
+                className="text-xs border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+              >
+                Force Development Mode
+              </Button>
             </div>
           )}
         </CardContent>
