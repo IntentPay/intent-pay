@@ -30,7 +30,7 @@ const abi = [
   }
 ];
 
-export async function GET(request: { url: string | URL }) {
+export async function GET(request: Request) {
   try {
     // 解析 URL 查詢參數，這裡我們假設用戶會傳遞一個 "address" 參數
     const url = new URL(request.url);
