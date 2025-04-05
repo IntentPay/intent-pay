@@ -1,4 +1,20 @@
-import { Home, LineChart, Package, Package2, PanelLeft, Settings, ShoppingCart, Users2 } from 'lucide-react';
+'use client';
+
+import { useState } from 'react';
+import {
+  Circle,
+  CreditCard,
+  Home,
+  LineChart,
+  Locate,
+  Package,
+  Package2,
+  PanelLeft,
+  Settings,
+  ShoppingCart,
+  Users2,
+  Wallet
+} from 'lucide-react';
 import Link from 'next/link';
 
 import {
@@ -10,7 +26,7 @@ import {
   BreadcrumbSeparator
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { User } from './user';
 import { VercelLogo } from '@/components/icons';
@@ -38,6 +54,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <main className="grid flex-1 items-start gap-2 p-4 sm:px-6 sm:py-0 md:gap-4 bg-muted/40">{children}</main>
             </div>
             <Toaster />
+            <MobileBottomNav />
           </main>
         </VerificationGate>
       </Providers>
@@ -96,8 +113,14 @@ function DesktopNav() {
 }
 
 function MobileNav() {
+  const [openMobileNav, setOpenMobileNav] = useState(false);
+
+  const handleLinkClick = () => {
+    setOpenMobileNav(false);
+  };
+
   return (
-    <Sheet>
+    <Sheet open={openMobileNav} onOpenChange={setOpenMobileNav}>
       <SheetTrigger asChild>
         <Button size="icon" variant="outline" className="sm:hidden">
           <PanelLeft className="h-5 w-5" />
@@ -105,6 +128,8 @@ function MobileNav() {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="sm:max-w-xs">
+        {/* className="sr-only" will not display but still work with "aria-labelledby" */}
+        <SheetTitle className="sr-only">Mobile Navigation</SheetTitle>
         <nav className="grid gap-6 text-lg font-medium">
           <Link
             href="https://docs.world.org/world-chain"
@@ -115,24 +140,37 @@ function MobileNav() {
           </Link>
           <Link
             href="/analytics"
+            onClick={handleLinkClick}
             className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
           >
             <Home className="h-5 w-5" />
             Dashboard
           </Link>
-          <Link href="/pageA" className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground">
+          <Link
+            href="/pageA"
+            onClick={handleLinkClick}
+            className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+          >
             <ShoppingCart className="h-5 w-5" />
             PageA
           </Link>
-          <Link href="/pageB" className="flex items-center gap-4 px-2.5 text-foreground">
+          <Link href="/pageB" onClick={handleLinkClick} className="flex items-center gap-4 px-2.5 text-foreground">
             <Package className="h-5 w-5" />
             World Payment
           </Link>
-          <Link href="/pageC" className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground">
+          <Link
+            href="/pageC"
+            onClick={handleLinkClick}
+            className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+          >
             <Users2 className="h-5 w-5" />
             PageC
           </Link>
-          <Link href="/" className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground">
+          <Link
+            href="/"
+            onClick={handleLinkClick}
+            className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+          >
             <LineChart className="h-5 w-5" />
             Settings
           </Link>
@@ -177,5 +215,39 @@ function DashboardBrandHeader() {
         </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * Bottom Navigation Bar
+ */
+function MobileBottomNav() {
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 z-50 mx-auto flex h-16 max-w-md items-center justify-around rounded-t-xl border-t bg-white shadow-lg sm:hidden">
+      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+        <Home className="w-5 h-5" />
+        <span className="text-xs">Home</span>
+      </button>
+
+      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+        <Wallet className="w-5 h-5" />
+        <span className="text-xs">Wallet</span>
+      </button>
+
+      {/* 中間 Logo */}
+      <div className="flex h-12 w-12 -mt-10 items-center justify-center rounded-full border bg-white shadow-md">
+        <Circle className="h-6 w-6 text-indigo-600" />
+      </div>
+
+      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+        <Locate className="w-5 h-5" />
+        <span className="text-xs">Track</span>
+      </button>
+
+      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+        <CreditCard className="w-5 h-5" />
+        <span className="text-xs">Card</span>
+      </button>
+    </nav>
   );
 }
