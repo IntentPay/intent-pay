@@ -272,11 +272,11 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
               nullifierHash: nullifierHash
             };
 
-            const service = new walletService();
-            const credential = await service.getCredentialByWorldIdForRegistration(userData.username);
-            const smartAccount = await service.initializeSmartAccount(credential);
-            userData.address = smartAccount.address;
-            localStorage.setItem('worldid_smart_account', JSON.stringify(smartAccount));
+            // const service = new walletService();
+            // const credential = await service.getCredentialByWorldIdForRegistration(userData.username);
+            // const smartAccount = await service.initializeSmartAccount(credential);
+            // userData.address = smartAccount.address;
+            // localStorage.setItem('worldid_smart_account', JSON.stringify(smartAccount));
             
             console.log('💾 Saving World ID user data:', userData);
             localStorage.setItem('worldid_user', JSON.stringify(userData));
@@ -369,13 +369,13 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
       address: '0x' + Array(40).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')
     };
 
-    // create smart account
-    const service = new walletService();
-    const credential = await service.getCredentialByWorldIdForRegistration(mockUserData.username);
-    const smartAccount = await service.initializeSmartAccount(credential);
-    mockUserData.address = smartAccount.address;
+    // create smart account (Cannot use )
+    // const service = new walletService();
+    // const credential = await service.getCredentialByWorldIdForRegistration(mockUserData.username);
+    // const smartAccount = await service.initializeSmartAccount(credential);
+    // mockUserData.address = smartAccount.address;
     localStorage.setItem('worldid_user', JSON.stringify(mockUserData));
-    localStorage.setItem('worldid_smart_account', JSON.stringify(smartAccount));
+    // localStorage.setItem('worldid_smart_account', JSON.stringify(smartAccount));
 
     toast({
       title: 'Test verification enabled',
