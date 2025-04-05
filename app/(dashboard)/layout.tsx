@@ -36,6 +36,19 @@ import MiniKitProvider from '@/lib/minikit-provider';
 import { VerificationGate } from '@/components/worldid/VerificationGate';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { MiniKit } from '@worldcoin/minikit-js';
+
+const sendHapticHeavyCommand = () =>
+  MiniKit.commands.sendHapticFeedback({
+    hapticsType: 'impact',
+    style: 'heavy'
+  });
+
+const sendHapticLightCommand = () =>
+  MiniKit.commands.sendHapticFeedback({
+    hapticsType: 'impact',
+    style: 'light'
+  });
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -116,6 +129,7 @@ function MobileNav() {
   const [openMobileNav, setOpenMobileNav] = useState(false);
 
   const handleLinkClick = () => {
+    sendHapticLightCommand();
     setOpenMobileNav(false);
   };
 
@@ -207,7 +221,7 @@ function DashboardBreadcrumb() {
 function DashboardBrandHeader() {
   return (
     <div className="flex items-center gap-4">
-      <Link href="/">
+      <Link href="/" onClick={sendHapticHeavyCommand}>
         <img src="/assets/IntentPay_header.jpg" alt="IntentPay Logo" className="h-10 w-auto rounded shadow-md" />
       </Link>
 
@@ -251,6 +265,7 @@ function MobileBottomNav() {
 
         return (
           <Link
+            onClick={sendHapticHeavyCommand}
             key={item.href}
             href={item.href}
             className={cn(
@@ -278,6 +293,7 @@ function MobileBottomNav() {
 
         return (
           <Link
+            onClick={sendHapticHeavyCommand}
             key={item.href}
             href={item.href}
             className={cn(
