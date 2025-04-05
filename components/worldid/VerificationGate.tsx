@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Loader2, Shield, AlertTriangle, Check, Bug, RotateCcw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useMiniKit } from '@/lib/minikit-provider';
+import { walletService } from '@/lib/circle/walletService';
 import WalletAuthButton from '@/components/wallet/WalletAuthButton';
 
 interface VerificationGateProps {
@@ -271,6 +272,12 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
               nullifierHash: nullifierHash
             };
 
+            // const service = new walletService();
+            // const credential = await service.getCredentialByWorldIdForRegistration(userData.username);
+            // const smartAccount = await service.initializeSmartAccount(credential);
+            // userData.address = smartAccount.address;
+            // localStorage.setItem('worldid_smart_account', JSON.stringify(smartAccount));
+            
             console.log('💾 Saving World ID user data:', userData);
             localStorage.setItem('worldid_user', JSON.stringify(userData));
             
@@ -346,7 +353,7 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
     }
   };
 
-  const handleTestVerify = () => {
+  const handleTestVerify = async () => {
     console.log('🧪 Using test mode to bypass verification');
     
     // Safe check - ensure client-side execution only
@@ -361,7 +368,14 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
       username: 'TestUser' + Math.floor(Math.random() * 1000),
       address: '0x' + Array(40).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')
     };
+
+    // create smart account (Cannot use )
+    // const service = new walletService();
+    // const credential = await service.getCredentialByWorldIdForRegistration(mockUserData.username);
+    // const smartAccount = await service.initializeSmartAccount(credential);
+    // mockUserData.address = smartAccount.address;
     localStorage.setItem('worldid_user', JSON.stringify(mockUserData));
+    // localStorage.setItem('worldid_smart_account', JSON.stringify(smartAccount));
 
     toast({
       title: 'Test verification enabled',

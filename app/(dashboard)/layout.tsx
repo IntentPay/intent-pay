@@ -10,12 +10,10 @@ import {
   PanelLeft,
   Settings,
   ShoppingCart,
-  Users2,
-  Wallet,
-  Locate
+  Users2
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 import {
   Breadcrumb,
@@ -53,12 +51,12 @@ const sendHapticLightCommand = () =>
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [showQRScanner, setShowQRScanner] = useState(false);
-  
+
   // 關閉 QR 掃描器的處理函數
   const handleCloseQRScanner = () => {
     setShowQRScanner(false);
   };
-  
+
   return (
     <MiniKitProvider>
       <Providers>
@@ -100,7 +98,7 @@ function DesktopNav() {
           <Home className="h-5 w-5" />
         </NavItem>
 
-        <NavItem href="/pageA" label="PageA">
+        <NavItem href="/pageA" label="Apple Pay">
           <ShoppingCart className="h-5 w-5" />
         </NavItem>
 
@@ -175,7 +173,7 @@ function MobileNav() {
             className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
           >
             <ShoppingCart className="h-5 w-5" />
-            PageA
+            Apple Pay
           </Link>
           <Link href="/pageB" onClick={handleLinkClick} className="flex items-center gap-4 px-2.5 text-foreground">
             <DollarSign className="h-5 w-5" />
@@ -250,7 +248,7 @@ interface MobileBottomNavProps {
 function MobileBottomNav({ onOpenQRScanner }: MobileBottomNavProps) {
   const pathname = usePathname();
   const miniKit = useMiniKit();
-  
+
   // 處理掃描QR碼按鈕點擊
   const handleScanClick = async () => {
     try {
@@ -258,7 +256,7 @@ function MobileBottomNav({ onOpenQRScanner }: MobileBottomNavProps) {
       localStorage.removeItem('wallet_auth_data');
       localStorage.removeItem('wallet_auth_signed_in');
       localStorage.removeItem('wallet_address');
-      
+
       // 打開 QR 掃描器
       onOpenQRScanner();
     } catch (error) {
@@ -270,7 +268,7 @@ function MobileBottomNav({ onOpenQRScanner }: MobileBottomNavProps) {
     { href: '/', label: 'Home', icon: Home },
     { href: '/intent-pay', label: 'Intent Pay', icon: CreditCard },
     { href: '/pageB', label: 'World Pay', icon: DollarSign },
-    { href: '/setting', label: 'Settings', icon: Settings },
+    { href: '/setting', label: 'Settings', icon: Settings }
   ];
 
   return (
@@ -309,7 +307,7 @@ function MobileBottomNav({ onOpenQRScanner }: MobileBottomNavProps) {
       })}
 
       {/* Middle Logo - 添加點擊處理 */}
-      <button 
+      <button
         onClick={handleScanClick}
         className="flex h-12 w-12 -mt-10 items-center justify-center rounded-full border bg-white shadow-md hover:bg-gray-50 active:shadow-inner transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
         aria-label="掃描 QR 碼並重置錢包授權"

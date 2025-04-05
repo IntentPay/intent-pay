@@ -12,29 +12,74 @@ import { createBundlerClient, SmartAccount, toWebAuthnAccount } from 'viem/accou
 // testing chains
 import { baseSepolia, arbitrumSepolia, sepolia } from 'viem/chains';
 
-const clientKey = process.env.CIRCLE_CLIENT_KEY || '';
-const clientUrl = process.env.CIRCLE_CLIENT_URL || ''; 
-const chainName = process.env.CIRCLE_CHAIN_NAME || '';
-const USDC_CONTRACT_ADDRESS = process.env.USDC_CONTRACT_ADDRESS as `0x${string}` || '0x0000000000000000000000000000000000000000';
-const USDC_DECIMALS = process.env.USDC_DECIMALS || 6;
+// 读取环境变量
+const clientKey = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_KEY || '';
+const clientUrl = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL || ''; 
+const chainName = process.env.NEXT_PUBLIC_CIRCLE_CHAIN_NAME || '';
+const chainId = parseInt(process.env.NEXT_PUBLIC_CIRCLE_CHAIN_ID || '421614');
+const USDC_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CIRCLE_USDC_ADDRESS as `0x${string}` || '';
+const USDC_DECIMALS = process.env.NEXT_PUBLIC_CIRCLE_USDC_DECIMALS || 6;
 const NUMBER_OF_USDC = 10 ** Number(USDC_DECIMALS);
+
+// 获取对应的链配置
+const getChainConfig = (chainId: number) => {
+  switch (chainId) {
+    case 421614:
+      return arbitrumSepolia;
+    case 84532:
+      return baseSepolia;
+    case 11155111:
+      return sepolia;
+    default:
+      return arbitrumSepolia;
+  }
+};
 
 export class walletService {
   private publicClient: any = null;
   private modularTransport: any = null;
-
   private passkeyTransport: any = null;
+  private chainConfig: any = null;
 
   constructor() {
-    this.modularTransport = toModularTransport(
-      `${clientUrl}/${chainName}`,
-      clientKey
-    );
-    this.publicClient = createPublicClient({
-      chain: arbitrumSepolia,
-      transport: this.modularTransport as Transport,
-    });
-    this.passkeyTransport = toPasskeyTransport(clientUrl, clientKey);
+    try {
+      // 获取链配置
+      this.chainConfig = getChainConfig(chainId);
+      
+      // 记录调试信息
+      console.log('Initializing wallet service with config:', {
+        clientUrl: clientUrl ? `${clientUrl.substring(0, 10)}...` : 'Not set',
+        chainName: chainName || 'Not set',
+        chainId: chainId,
+        clientKeyExists: !!clientKey,
+        chainConfig: this.chainConfig ? `${this.chainConfig.name} (id: ${this.chainConfig.id})` : 'Not found'
+      });
+      
+      // 检查配置是否完整
+      if (!clientUrl || !chainName || !clientKey) {
+        console.error('Missing Circle wallet configuration. Check your environment variables.');
+        return;
+      }
+      
+      // 创建传输层
+      this.modularTransport = toModularTransport(
+        `${clientUrl}/${chainName}`,
+        clientKey
+      );
+      
+      // 创建公共客户端
+      this.publicClient = createPublicClient({
+        chain: this.chainConfig,
+        transport: this.modularTransport as Transport,
+      });
+      
+      // 创建密钥传输层
+      this.passkeyTransport = toPasskeyTransport(clientUrl, clientKey);
+      
+      console.log('Wallet service initialized successfully');
+    } catch (error) {
+      console.error('Error initializing wallet service:', error);
+    }
   }
 
   /**
@@ -42,21 +87,34 @@ export class walletService {
    * @param hashWorldId - The hash of the World ID
    * @returns The credential for the passkey
    */
-  async getCredentialByWorldIdForRegistration(hashWorldId: string) {
+  async getCredentialByWorldIdForRegistration(worldId: string) {
     try {
-      console.log('REGISTER_PASSKEY', { walletUniqueKey: hashWorldId });
+      if (!this.passkeyTransport) {
+        throw new Error('Wallet service not properly initialized');
+      }
+      
+      // 使用安全的标识符作为钱包用户名
+      // 对于World ID，我们使用username加一些随机性来确保唯一性
+      const safeUsername = `${worldId}_${Date.now().toString().substring(8)}`;
+      
+      console.log('REGISTER_PASSKEY attempt for:', { safeUsername: safeUsername.substring(0, 10) + '...' });
       
       const credential = await toWebAuthnCredential({
         transport: this.passkeyTransport,
         mode: WebAuthnMode.Register,
-        // credentialId: credential.id,  for existing login
-        username: hashWorldId // different unique key for different wallet
+        username: safeUsername // 不同的唯一键对应不同的钱包
       });
 
-      console.log('REGISTER_PASSKEY', { id : credential.rpId });
+      console.log('REGISTER_PASSKEY success, id:', credential.rpId);
       return credential;
     } catch (error) {
-      console.error('REGISTER_PASSKEY', error);
+      console.log('REGISTER_PASSKEY failed, trying login instead:', error);
+      
+      // 如果注册失败，尝试登录（可能用户已经有一个密钥）
+      if (worldId) {
+        return this.getCredentialByWorldIdForLogin(worldId);
+      }
+      
       throw error;
     }
   }
@@ -67,60 +125,130 @@ export class walletService {
    * @param credentialId - Existed passkey
    * @returns The credential for the passkey
    */
-  async getCredentialByWorldIdForLogin(hashWorldId?: string, credentialId?: string) {
-    if (!hashWorldId && !credentialId) {
-      throw new Error('hashWorldId or credentialId is required');
+  async getCredentialByWorldIdForLogin(worldId?: string, credentialId?: string) {
+    if (!worldId && !credentialId) {
+      throw new Error('worldId or credentialId is required');
     }
     
     try {
-      console.log('LOGIN_PASSKEY', { username: hashWorldId });
+      if (!this.passkeyTransport) {
+        throw new Error('Wallet service not properly initialized');
+      }
+      
+      // 使用相同的安全格式作为登录名
+      const safeUsername = worldId ? `${worldId}_${Date.now().toString().substring(8)}` : undefined;
+      
+      console.log('LOGIN_PASSKEY attempt', { 
+        safeUsername: safeUsername ? safeUsername.substring(0, 10) + '...' : 'using credential', 
+        hasCredentialId: !!credentialId
+      });
 
       let credential;
-      if (!credentialId) {
+      if (!credentialId && safeUsername) {
         credential = await toWebAuthnCredential({
           transport: this.passkeyTransport,
           mode: WebAuthnMode.Login,
-          username: hashWorldId, // different hashWorldId for different wallet
+          username: safeUsername,
         });
-      } else {
+      } else if (credentialId) {
         credential = await toWebAuthnCredential({
           transport: this.passkeyTransport,
           mode: WebAuthnMode.Login,
           credentialId
         });
+      } else {
+        throw new Error('Could not determine login method');
       }
 
-      console.log('LOGIN_PASSKEY', { username: hashWorldId });
+      console.log('LOGIN_PASSKEY success');
       return credential;
     } catch (error) {
-      console.error('LOGIN_PASSKEY', error);
+      console.error('LOGIN_PASSKEY failed:', error);
       throw error;
     }
   }
 
   /**
-   * 1. Get Crendential first then initialize Smart Account
-   * 2. Initialize Smart Account
-   * @param credential - The credential for the passkey
-   * @returns The smart account
+   * Initialize Smart Account
+   * @param credential - Credential for the passkey
+   * @returns SmartAccount
    */
   async initializeSmartAccount(credential: any) {
     try {
-      console.log(`INITIALIZE_SMART_ACCOUNT ${credential}`);
-
-      const smartAccount = await toCircleSmartAccount({
+      if (!this.modularTransport || !this.publicClient || !this.chainConfig) {
+        throw new Error('Wallet service not properly initialized');
+      }
+      
+      console.log('Initializing smart account with credential');
+      
+      // 创建Circle智能账户
+      const account = await toCircleSmartAccount({
         client: this.publicClient as Client,
         owner: toWebAuthnAccount({
-            credential,
+          credential,
         }),
       });
+      
+      console.log('Smart account created:', { address: account.address });
 
-      console.log('INITIALIZE_SMART_ACCOUNT', { smartAccount });
-      return smartAccount;
+      // 创建捆绑客户端
+      const bundlerClient = await createBundlerClient({
+        chain: this.chainConfig,
+        transport: this.modularTransport as Transport,
+        account: account as SmartAccount,
+      });
+      
+      console.log('Bundler client created');
+
+      return {
+        account,
+        address: account.address,
+        bundlerClient,
+      };
     } catch (error) {
-      console.error('INITIALIZE_SMART_ACCOUNT', error);
+      console.error('INITIALIZE_SMART_ACCOUNT failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Get Smart Account
+   * @returns SmartAccount or null
+   */
+  async getSmartAccount() {
+    try {
+      // Get the smart account from local storage
+      const smartAccountString = localStorage.getItem('worldid_smart_account');
+      if (!smartAccountString) {
+        console.log('Smart account not found in local storage');
+        return null;
+      }
+
+      // Parse the smart account
+      const smartAccountData = JSON.parse(smartAccountString);
+      if (!smartAccountData || !smartAccountData.account) {
+        console.log('Invalid smart account data');
+        return null;
+      }
+
+      return smartAccountData;
+    } catch (error) {
+      console.error('GET_SMART_ACCOUNT', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get Account Address
+   * @returns Account address or null
+   */
+  async getAccountAddress() {
+    const smartAccount = await this.getSmartAccount();
+    if (!smartAccount) {
+      return null;
+    }
+
+    return smartAccount.address;
   }
 
   /**
@@ -132,15 +260,15 @@ export class walletService {
    */
   async sendUSDCTransfer(recipientAddress: string, amount: string, smartAccount: any) {
     try {
-      console.log('SEND_USDC_TRANSFER', { recipientAddress, amount: amount.toString() });
-
       if (!this.publicClient || !smartAccount) {
         throw new Error('Smart account not initialized');
       }
+      
+      console.log('SEND_USDC_TRANSFER', { recipientAddress, amount: amount.toString() });
 
       const bundlerClient = createBundlerClient({
           account: smartAccount as SmartAccount,
-          chain: arbitrumSepolia,
+          chain: this.chainConfig,
           transport: this.modularTransport,
       })
 
