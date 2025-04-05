@@ -1,0 +1,340 @@
+/* 赛博朋克风格动画效果 */
+
+/* 霓虹灯呼吸效果 */
+@keyframes neonPulse {
+  0% {
+    box-shadow: 0 0 7px rgba(0, 240, 255, 0.7), 0 0 10px rgba(0, 240, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.9), 0 0 25px rgba(0, 240, 255, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 7px rgba(0, 240, 255, 0.7), 0 0 10px rgba(0, 240, 255, 0.5);
+  }
+}
+
+/* 紫色霓虹灯呼吸效果 */
+@keyframes purplePulse {
+  0% {
+    box-shadow: 0 0 7px rgba(211, 0, 197, 0.7), 0 0 10px rgba(211, 0, 197, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(211, 0, 197, 0.9), 0 0 25px rgba(211, 0, 197, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 7px rgba(211, 0, 197, 0.7), 0 0 10px rgba(211, 0, 197, 0.5);
+  }
+}
+
+/* 按钮悬浮动画 */
+@keyframes buttonHover {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+/* 数据加载效果 */
+@keyframes dataStream {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 100% 100%;
+  }
+}
+
+/* 全息图闪烁效果 */
+@keyframes hologramFlicker {
+  0% {
+    opacity: 1;
+  }
+  25% {
+    opacity: 0.8;
+  }
+  30% {
+    opacity: 1;
+  }
+  35% {
+    opacity: 0.6;
+  }
+  40% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  75% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* 输入框边框扫描效果 */
+@keyframes borderScan {
+  0% {
+    border-color: rgba(0, 240, 255, 0.7);
+    box-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
+  }
+  25% {
+    border-right-color: rgba(211, 0, 197, 0.7);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
+  }
+  50% {
+    border-bottom-color: rgba(211, 0, 197, 0.7);
+    box-shadow: 0 0 15px rgba(211, 0, 197, 0.5);
+  }
+  75% {
+    border-left-color: rgba(0, 240, 255, 0.7);
+    box-shadow: 0 0 10px rgba(211, 0, 197, 0.7);
+  }
+  100% {
+    border-color: rgba(0, 240, 255, 0.7);
+    box-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
+  }
+}
+
+/* 应用类 */
+.neon-pulse {
+  animation: neonPulse 3s infinite ease-in-out;
+}
+
+.purple-pulse {
+  animation: purplePulse 3s infinite ease-in-out;
+}
+
+.button-hover {
+  transition: all 0.3s ease;
+}
+
+.button-hover:hover {
+  animation: buttonHover 1s infinite ease-in-out;
+}
+
+.input-focus {
+  transition: all 0.3s ease;
+}
+
+.input-focus:focus {
+  animation: borderScan 3s infinite linear;
+}
+
+.hologram {
+  animation: hologramFlicker 5s infinite;
+}
+
+/* 自定义滚动条样式 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #10173a;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #2a3156;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #00f0ff;
+}
+
+/* 模糊玻璃效果 */
+.glass-effect {
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  background: rgba(16, 23, 58, 0.7);
+  border: 1px solid rgba(42, 49, 86, 0.7);
+}
+
+/* 数据流背景 */
+.data-stream-bg {
+  background: linear-gradient(45deg, 
+    #10173a 25%, 
+    #191d3e 25%, 
+    #191d3e 50%, 
+    #10173a 50%, 
+    #10173a 75%, 
+    #191d3e 75%, 
+    #191d3e);
+  background-size: 8px 8px;
+  animation: dataStream 20s infinite linear;
+}
+
+/* 模态框样式 */
+.cyberpunk-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.cyberpunk-modal {
+  background-color: #191d3e;
+  border: 1px solid #2a3156;
+  border-radius: 0.75rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  width: 100%;
+  max-width: 28rem;
+  padding: 1.5rem;
+}
+
+.cyberpunk-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.cyberpunk-modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+}
+
+.cyberpunk-modal-content {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cyberpunk-qr-scanner {
+  aspect-ratio: 1 / 1;
+  max-width: 300px;
+  margin: 0 auto 1rem auto;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.cyberpunk-qr-scanner-inner {
+  width: 100%;
+  height: 100%;
+  background-color: #0d1129;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.cyberpunk-modal-footer {
+  margin-top: 1rem;
+}
+
+.cyberpunk-token-item {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  background-color: #191d3e;
+  border: 1px solid #2a3156;
+  color: #c2c6ff;
+  padding: 0.75rem;
+  height: auto;
+  transition: all 0.2s ease;
+}
+
+.cyberpunk-token-item:hover {
+  background-color: #232853;
+}
+
+.cyberpunk-token-item.selected {
+  background-color: #0d1129;
+  border-color: #00f0ff;
+  color: white;
+}
+
+.cyberpunk-token-icon {
+  height: 2rem;
+  width: 2rem;
+  border-radius: 9999px;
+  background-color: #232853;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0.75rem;
+}
+
+.cyberpunk-token-info {
+  text-align: left;
+}
+
+.cyberpunk-token-symbol {
+  font-weight: 500;
+  color: white;
+}
+
+.cyberpunk-token-name {
+  font-size: 0.75rem;
+  color: #8a8dbd;
+}
+
+.cyberpunk-search-container {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.cyberpunk-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 1.25rem;
+  width: 1.25rem;
+  color: #8a8dbd;
+}
+
+.cyberpunk-empty-state {
+  text-align: center;
+  padding: 1.5rem;
+  color: #8a8dbd;
+}
+
+.cyberpunk-empty-icon {
+  height: 2rem;
+  width: 2rem;
+  margin: 0 auto 0.5rem;
+  color: rgba(138, 141, 189, 0.5);
+}
+
+/* Scrollable container */
+.cyberpunk-scrollable-container {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* Custom scrollbar for token list */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #10173a;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #2a3156;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #383f6c;
+}

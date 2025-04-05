@@ -145,7 +145,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose, isOpen }
               <p className="text-xs text-gray-400 mb-2">Test Options (Development Only)</p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => provideMockAddress('0x71C7656EC7ab88b098defB751B7401B5f6d8976F')}
+                  onClick={() => provideMockAddress('0x67aad1351bb0665d2a560a52bef9ab8621567d25')}
                   className="flex-1 bg-green-800 text-white py-1 px-2 rounded text-xs"
                 >
                   Test Address 1
