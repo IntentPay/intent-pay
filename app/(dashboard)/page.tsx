@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowDownUp, ArrowUpRight, Plus, Wallet, User, Circle, Locate, CreditCard, Home } from 'lucide-react';
+import { ArrowDownUp, ArrowUpRight, Plus, Wallet, User, Circle, Locate, CreditCard, Home, Check, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -20,10 +20,12 @@ export default function WalletHomePage() {
   // State management for user information
   const [user, setUser] = useState<WorldIDUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [addressCopied, setAddressCopied] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   // Mockup wallet data (for development)
   const walletAddress = user?.address || '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
-  const usdcBalance = 1250.75;
+  const usdcBalance = walletBalance !== null ? walletBalance : 1250.75;
   const transactions = [
     { id: 1, type: 'receive', amount: '+120 USDC', date: '2025-04-03', from: '0x1234...5678', status: 'completed' },
     { id: 2, type: 'send', amount: '-45 USDC', date: '2025-04-02', to: '0xabcd...efgh', status: 'completed' },
@@ -43,6 +45,42 @@ export default function WalletHomePage() {
         // Also try to get the latest data from MiniKit
         if (MiniKit.isInstalled() && MiniKit.user) {
           console.log('MiniKit user:', MiniKit.user);
+          
+          // Try to get the wallet balance if available
+          const fetchBalance = async () => {
+            try {
+              // @ts-ignore - MiniKit.getBalance may exist in newer versions but not in our type definitions
+              if (typeof MiniKit.getBalance === 'function') {
+                // @ts-ignore
+                const balance = await MiniKit.getBalance();
+                if (balance !== undefined && balance !== null) {
+                  setWalletBalance(parseFloat(balance));
+                  console.log('Wallet balance:', balance);
+                }
+              } else {
+                console.log('MiniKit.getBalance is not available');
+                
+                // Alternative: Try to get balance from World Wallet if available
+                // @ts-ignore - Using alternative API that might be available
+                if (typeof MiniKit.worldWallet?.getBalance === 'function') {
+                  try {
+                    // @ts-ignore
+                    const worldBalance = await MiniKit.worldWallet.getBalance();
+                    if (worldBalance) {
+                      setWalletBalance(parseFloat(worldBalance));
+                      console.log('World Wallet balance:', worldBalance);
+                    }
+                  } catch (balanceError) {
+                    console.warn('Error fetching World Wallet balance:', balanceError);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('Error fetching wallet balance:', error);
+            }
+          };
+          
+          fetchBalance();
         }
       } catch (error) {
         console.error('Error loading user data:', error);
@@ -52,11 +90,20 @@ export default function WalletHomePage() {
     }
   }, []);
 
+  // Function to copy the wallet address
+  const copyAddress = () => {
+    if (walletAddress) {
+      navigator.clipboard.writeText(walletAddress);
+      setAddressCopied(true);
+      setTimeout(() => setAddressCopied(false), 2000);
+    }
+  };
+
   return (
     <div className="flex flex-col w-full max-w-md mx-auto gap-4 pb-20">
       {/* Wallet Header */}
       <div className="flex flex-col items-center justify-center bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl p-6 shadow-lg">
-        <h1 className="text-2xl font-bold">IntentPay</h1>
+        {/* 移除 IntentPay 標題 */}
 
         {user && (
           <div className="mt-1 mb-3 flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5">
@@ -68,10 +115,22 @@ export default function WalletHomePage() {
         {/* Wallet Balance */}
         <div className="text-3xl font-bold my-3">{formatCurrency(usdcBalance)}</div>
 
-        <div className="flex items-center gap-1 bg-white/20 text-white px-3 py-1 rounded-full text-sm">
-          <Wallet className="h-3 w-3" />
-          <span>{truncateAddress(walletAddress, 6, 4)}</span>
-        </div>
+        <button 
+          onClick={copyAddress}
+          className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-full text-sm transition-colors"
+        >
+          {addressCopied ? (
+            <>
+              <Check className="h-3 w-3" />
+              <span>Copied!</span>
+            </>
+          ) : (
+            <>
+              <Wallet className="h-3 w-3" />
+              <span>{truncateAddress(walletAddress, 6, 4)}</span>
+            </>
+          )}
+        </button>
 
         {/* Add World ID */}
         {user?.worldId && (

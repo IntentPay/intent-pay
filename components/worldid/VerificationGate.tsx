@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Loader2, Shield, AlertTriangle, Check, Bug, RotateCcw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useMiniKit } from '@/lib/minikit-provider';
+import WalletAuthButton from '@/components/wallet/WalletAuthButton';
 
 interface VerificationGateProps {
   children: ReactNode;
@@ -15,7 +16,7 @@ interface VerificationGateProps {
 
 export function VerificationGate({ children }: VerificationGateProps) {
   const { error: worldIdError } = useWorldID();
-  const { isWorldApp, isReady, error: minikitError, forceDevelopmentMode } = useMiniKit();
+  const { isWorldApp, isReady, error: minikitError, forceDevelopmentMode, isSignedIn } = useMiniKit();
   const [isVerified, setIsVerified] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [debugInfo, setDebugInfo] = useState('No debug info yet');
@@ -90,7 +91,10 @@ export function VerificationGate({ children }: VerificationGateProps) {
       try {
         if (typeof window !== 'undefined') {
           const storedVerificationStatus = localStorage.getItem('worldid_verified');
-          if (storedVerificationStatus === 'true') {
+          const walletAuthSignedIn = localStorage.getItem('wallet_auth_signed_in') === 'true';
+          
+          // User is verified if they have either World ID verification OR wallet auth
+          if (storedVerificationStatus === 'true' || walletAuthSignedIn) {
             console.log('✅ User is already verified, allowing access');
             setIsVerified(true);
             
@@ -109,11 +113,18 @@ export function VerificationGate({ children }: VerificationGateProps) {
     // Run checks
     checkMiniKit();
     checkVerificationStatus();
-  }, [isWorldApp, isReady, minikitError]);
+  }, [isWorldApp, isReady, minikitError, isSignedIn]);
+
+  // If the user has successfully signed in with wallet auth, update the verification status
+  useEffect(() => {
+    if (isSignedIn) {
+      setIsVerified(true);
+    }
+  }, [isSignedIn]);
 
   const verifyPayload: VerifyCommandInput = {
     action: 'intent', // This is your action ID from the Developer Portal
-    verification_level: VerificationLevel.Orb, // Orb | Device
+    verification_level: VerificationLevel.Device, // Orb | Device
   }
 
   const handleVerify = async () => {
@@ -480,7 +491,7 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
             </div>
           </div>
           <CardTitle className="text-2xl">Verification Required</CardTitle>
-          <CardDescription>Please verify with World ID to access IntentPay</CardDescription>
+          <CardDescription>Please verify with World ID or Wallet Auth to access IntentPay</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {worldIdError && (
@@ -542,6 +553,8 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
               <span className="mx-4 flex-shrink text-xs text-gray-500">OR</span>
               <div className="flex-grow border-t border-gray-300"></div>
             </div>
+
+            <WalletAuthButton />
 
             <Button 
               onClick={handleTestVerify} 
