@@ -56,11 +56,10 @@ export default function PageB() {
 
         <form onSubmit={sendPayment}>
           <CardContent className="space-y-4">
-            {/* 拉絲質感區塊 */}
             <div
               className="rounded-xl p-5 text-white shadow-inner text-sm sm:text-base bg-cover bg-center"
               style={{
-                backgroundImage: 'url("https://www.transparenttextures.com/patterns/brushed-alum.png")',
+                backgroundImage: 'url("/assets/brushed-alum.png")',
                 backgroundColor: '#2b2b2b'
               }}
             >
