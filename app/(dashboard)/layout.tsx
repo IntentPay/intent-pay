@@ -37,6 +37,20 @@ import { VerificationGate } from '@/components/worldid/VerificationGate';
 import { cn } from '@/lib/utils';
 import { QRScannerModal } from '@/components/qr/QRScanner';
 
+import { MiniKit } from '@worldcoin/minikit-js';
+
+const sendHapticHeavyCommand = () =>
+  MiniKit.commands.sendHapticFeedback({
+    hapticsType: 'impact',
+    style: 'heavy'
+  });
+
+const sendHapticLightCommand = () =>
+  MiniKit.commands.sendHapticFeedback({
+    hapticsType: 'impact',
+    style: 'light'
+  });
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [showQRScanner, setShowQRScanner] = useState(false);
   
@@ -54,7 +68,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
               <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
                 <MobileNav />
-                <DashboardBrandHeader />
                 <div className="ml-auto flex w-full items-center justify-end gap-2">
                   <User />
                 </div>
@@ -125,6 +138,7 @@ function MobileNav() {
   const [openMobileNav, setOpenMobileNav] = useState(false);
 
   const handleLinkClick = () => {
+    sendHapticLightCommand();
     setOpenMobileNav(false);
   };
 
@@ -215,9 +229,9 @@ function DashboardBreadcrumb() {
 
 function DashboardBrandHeader() {
   return (
-    <div className="flex flex-1 items-center justify-center">
-      <Link href="/" className="flex items-center">
-        <img src="/assets/IntentPay_header.jpg" alt="IntentPay Logo" className="h-10 md:h-12 w-auto rounded shadow-md object-contain" />
+    <div className="flex items-center gap-4">
+      <Link href="/" onClick={sendHapticHeavyCommand}>
+        <img src="/assets/IntentPay_header.jpg" alt="IntentPay Logo" className="h-10 w-auto rounded shadow-md" />
       </Link>
 
       <div className="hidden md:flex flex-col ml-3">
@@ -277,6 +291,7 @@ function MobileBottomNav({ onOpenQRScanner }: MobileBottomNavProps) {
 
         return (
           <Link
+            onClick={sendHapticHeavyCommand}
             key={item.href}
             href={item.href}
             className={cn(
@@ -310,6 +325,7 @@ function MobileBottomNav({ onOpenQRScanner }: MobileBottomNavProps) {
 
         return (
           <Link
+            onClick={sendHapticHeavyCommand}
             key={item.href}
             href={item.href}
             className={cn(

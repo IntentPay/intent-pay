@@ -1,7 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowDownUp, ArrowUpRight, Plus, Wallet, User, Circle, Locate, CreditCard, Home, Check, Copy } from 'lucide-react';
+import {
+  ArrowDownUp,
+  ArrowUpRight,
+  Plus,
+  Wallet,
+  User,
+  Circle,
+  Locate,
+  CreditCard,
+  Home,
+  Check,
+  Copy
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,6 +27,13 @@ interface WorldIDUser {
   username: string;
   address: string;
 }
+
+// TODO: Integrate the World Chant and Notification feature.
+const sendHapticSuccessCommand = () =>
+  MiniKit.commands.sendHapticFeedback({
+    hapticsType: 'notification',
+    style: 'success'
+  });
 
 export default function WalletHomePage() {
   // State management for user information
@@ -45,7 +64,7 @@ export default function WalletHomePage() {
         // Also try to get the latest data from MiniKit
         if (MiniKit.isInstalled() && MiniKit.user) {
           console.log('MiniKit user:', MiniKit.user);
-          
+
           // Try to get the wallet balance if available
           const fetchBalance = async () => {
             try {
@@ -59,7 +78,7 @@ export default function WalletHomePage() {
                 }
               } else {
                 console.log('MiniKit.getBalance is not available');
-                
+
                 // Alternative: Try to get balance from World Wallet if available
                 // @ts-ignore - Using alternative API that might be available
                 if (typeof MiniKit.worldWallet?.getBalance === 'function') {
@@ -79,7 +98,7 @@ export default function WalletHomePage() {
               console.error('Error fetching wallet balance:', error);
             }
           };
-          
+
           fetchBalance();
         }
       } catch (error) {
@@ -115,7 +134,7 @@ export default function WalletHomePage() {
         {/* Wallet Balance */}
         <div className="text-3xl font-bold my-3">{formatCurrency(usdcBalance)}</div>
 
-        <button 
+        <button
           onClick={copyAddress}
           className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-full text-sm transition-colors"
         >
