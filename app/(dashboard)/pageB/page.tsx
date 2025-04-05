@@ -96,7 +96,7 @@ export default function PageB() {
               </div>
             ) : (
               <Button type="submit" className="w-full bg-primary">
-                Buy USDT
+                Buy USDC
               </Button>
             )}
           </CardFooter>
