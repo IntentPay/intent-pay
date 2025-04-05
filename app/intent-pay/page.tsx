@@ -43,8 +43,9 @@ import { Label } from '@/components/ui/label';
 import { getMultiChainTokenList, getTokensByChain, TokenInfoDto, getUsdcTokenInfo } from '@/lib/1inch/token';
 import { useToast } from '@/components/ui/use-toast';
 import { QRScannerModal } from '@/components/qr/QRScanner';
-import { MiniKit } from '@worldcoin/minikit-js';
+import { MiniKit, tokenToDecimals, Tokens, PayCommandInput } from '@worldcoin/minikit-js';
 import { searchTokensApi } from '@/lib/1inch/token';
+import { getQuote, convertToTokenUnits, QuoteOutput } from '@/lib/1inch/quote';
 
 // Send haptic feedback
 const sendHapticHeavyCommand = () =>
@@ -68,7 +69,7 @@ function IntentPayContent() {
   const [recipientAddress, setRecipientAddress] = useState(addressParam || '');
   const [amount, setAmount] = useState('');
   const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE);
-  const [selectedChainId, setSelectedChainId] = useState<number>(1); // Default to Ethereum
+  const [selectedChainId, setSelectedChainId] = useState<number>(8453); // Default to Base chain
   const [showTokenSelector, setShowTokenSelector] = useState(false);
   const [estimatedReceived, setEstimatedReceived] = useState('0');
   const [fee, setFee] = useState('0');
@@ -77,6 +78,10 @@ function IntentPayContent() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [sourceTokenInfo, setSourceTokenInfo] = useState<TokenInfoDto | null>(null);
   const [isValidAddress, setIsValidAddress] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [isQuoteLoading, setIsQuoteLoading] = useState(false);
+  const [quoteData, setQuoteData] = useState<QuoteOutput | null>(null);
+  const [destinationChainId, setDestinationChainId] = useState<number>(137); // Default to Polygon
   
   // Token states
   const [availableTokens, setAvailableTokens] = useState<TokenInfoDto[]>([]);
@@ -89,8 +94,12 @@ function IntentPayContent() {
     results: TokenInfoDto[];
   }>({ loading: false, results: [] });
   
+  // Chain states
+  const [availableChains, setAvailableChains] = useState<number[]>([8453, 137]);
+  const [showDestinationChainSelector, setShowDestinationChainSelector] = useState(false);
+  
   // Get current chain name
-  const chainName = selectedChainId ? CHAIN_NAMES[selectedChainId] : '';
+  const chainName = selectedChainId ? CHAIN_NAMES[selectedChainId.toString() as keyof typeof CHAIN_NAMES] : '';
   
   // Load USDC token info using 1inch API
   useEffect(() => {
@@ -186,18 +195,72 @@ function IntentPayContent() {
     }
   };
   
-  // Calculate estimated receipt amount
+  // Calculate estimated receipt amount via 1inch API
   useEffect(() => {
-    if (amount && !isNaN(parseFloat(amount)) && selectedToken) {
-      const amountNum = parseFloat(amount);
-      const fee = amountNum * 0.003; // 0.3% fee assumed
-      setFee(fee.toFixed(selectedToken.decimals === 6 ? 2 : 4));
-      setEstimatedReceived((amountNum - fee).toFixed(selectedToken.decimals === 6 ? 2 : 4));
-    } else {
-      setFee('0');
-      setEstimatedReceived('0');
-    }
-  }, [amount, selectedToken]);
+    let isMounted = true;
+    
+    const fetchQuote = async () => {
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0 || !selectedToken) {
+        setFee('0');
+        setEstimatedReceived('0');
+        setQuoteData(null);
+        return;
+      }
+      
+      setIsQuoteLoading(true);
+      
+      try {
+        // Convert amount to token units
+        const amountInUnits = convertToTokenUnits(amount, selectedToken.decimals);
+        
+        // Use a default wallet address for quoting purposes
+        const defaultWalletAddress = '0x0000000000000000000000000000000000000000';
+        
+        // Get the quote
+        const quote = await getQuote({
+          srcChain: selectedChainId,
+          dstChain: destinationChainId,
+          srcTokenAddress: selectedToken.address,
+          dstTokenAddress: selectedToken.address, // Same token on different chain
+          amount: amountInUnits,
+          walletAddress: defaultWalletAddress,
+          enableEstimate: true
+        });
+        
+        if (isMounted) {
+          setQuoteData(quote);
+          
+          // Calculate the fee and estimated amount based on the quote
+          const receivedAmount = parseFloat(quote.dstTokenAmount) / Math.pow(10, selectedToken.decimals);
+          const feeAmount = parseFloat(amount) - receivedAmount;
+          
+          setEstimatedReceived(receivedAmount.toFixed(selectedToken.decimals === 6 ? 2 : 4));
+          setFee(feeAmount.toFixed(selectedToken.decimals === 6 ? 2 : 4));
+        }
+      } catch (error) {
+        console.error('Error fetching quote:', error);
+        // Fallback to simple estimation if the API call fails
+        if (isMounted) {
+          const amountNum = parseFloat(amount);
+          const fee = amountNum * 0.003; // 0.3% fee assumed
+          setFee(fee.toFixed(selectedToken.decimals === 6 ? 2 : 4));
+          setEstimatedReceived((amountNum - fee).toFixed(selectedToken.decimals === 6 ? 2 : 4));
+        }
+      } finally {
+        if (isMounted) {
+          setIsQuoteLoading(false);
+        }
+      }
+    };
+    
+    // Debounce the quote fetch to avoid too many API calls
+    const debounceTimeout = setTimeout(fetchQuote, 500);
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(debounceTimeout);
+    };
+  }, [amount, selectedToken, selectedChainId, destinationChainId]);
   
   // Handle slippage change
   const handleSlippageChange = (value: number) => {
@@ -205,8 +268,8 @@ function IntentPayContent() {
     setShowSlippageSettings(false);
   };
   
-  // Handle payment submission
-  const handleSubmit = (e: FormEvent) => {
+  // Handle payment submission with World ID
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     sendHapticHeavyCommand();
     
@@ -237,15 +300,70 @@ function IntentPayContent() {
       return;
     }
     
-    // Simulate transaction processing
-    toast({
-      title: "Processing Transaction",
-      description: "Your transaction request is being processed...",
-    });
+    if (!MiniKit.isInstalled()) {
+      toast({
+        title: "Error",
+        description: "World ID is not installed. Please install World App to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    setTimeout(() => {
-      setPaymentSuccess(true);
-    }, 1500);
+    try {
+      // Calculate WLD amount (example conversion rate 1 USDC = 1.35 WLD)
+      const conversionRate = 1.35;
+      const amountNum = parseFloat(amount);
+      const wldAmount = amountNum * conversionRate;
+      
+      // Create World ID payment payload
+      const payload: PayCommandInput = {
+        reference: `intent-pay-${Date.now()}`,
+        to: recipientAddress, // Send to recipient address
+        tokens: [
+          {
+            symbol: Tokens.WLD,
+            token_amount: tokenToDecimals(wldAmount, Tokens.WLD).toString()
+          }
+        ],
+        description: `Pay ${amount} ${selectedToken.symbol} with ${wldAmount.toFixed(4)} WLD`
+      };
+      
+      // Show processing toast
+      toast({
+        title: "Processing Transaction",
+        description: "Waiting for World ID confirmation...",
+      });
+      
+      // Send payment request to World ID
+      const { finalPayload } = await MiniKit.commandsAsync.pay(payload);
+      
+      if (finalPayload.status === 'success') {
+        console.log('World ID payment successful!', finalPayload);
+        setPaymentSuccess(true);
+        
+        toast({
+          title: "Payment Successful",
+          description: "Your transaction has been submitted to receive {estimatedReceived} {selectedToken?.symbol} at {recipientAddress.substring(0, 6)}...{recipientAddress.substring(recipientAddress.length - 4)}",
+          variant: "default",
+        });
+      } else {
+        console.error('World ID payment failed:', finalPayload);
+        
+        toast({
+          title: "Payment Failed",
+          description: "World ID payment could not be processed. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error processing World ID payment:', error);
+      
+      toast({
+        title: "Payment Error",
+        description: "An error occurred while processing your payment. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
   
   // Select chain
@@ -351,19 +469,16 @@ function IntentPayContent() {
   );
   
   // Fix the network logo type safety issue by explicitly defining valid chain IDs
-  const SUPPORTED_CHAIN_IDS = [1, 42161, 8453, 43114] as const;
+  const SUPPORTED_CHAIN_IDS = [8453, 137] as const;
   type SupportedChainId = typeof SUPPORTED_CHAIN_IDS[number];
 
   // Network icon component
   const NetworkIcon = ({ chainId }: { chainId: number }) => {
-    const networkName = CHAIN_NAMES[chainId] || "Unknown";
+    const networkName = CHAIN_NAMES[chainId.toString() as keyof typeof CHAIN_NAMES] || "Unknown";
     
     // Map chainId to icon path
     const getNetworkIconPath = (id: number) => {
       const chainMap: Record<number, string> = {
-        1: "/assets/chains/ethereum.svg",  // Ethereum
-        42161: "/assets/chains/arbitrum.svg",  // Arbitrum
-        43114: "/assets/chains/avalanche.svg",  // Avalanche
         8453: "/assets/chains/base.svg",  // Base
         137: "/assets/chains/polygon.svg"  // Polygon
       };
@@ -404,8 +519,6 @@ function IntentPayContent() {
     return !isNaN(numVal) ? numVal.toString() : '0';
   };
 
-  const [showQRScanner, setShowQRScanner] = useState(false);
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0d1129] to-[#10173a] pb-16">
       {/* 顶部头像和背景 */}
@@ -445,7 +558,7 @@ function IntentPayContent() {
                 <span className="text-[#8a8dbd]">Network</span>
                 <span className="text-white font-medium flex items-center">
                   <span className="h-2 w-2 rounded-full bg-[#05ffa1] mr-2 animate-pulse"></span>
-                  Ethereum
+                  Base
                 </span>
               </div>
               <div className="flex justify-between">
@@ -553,20 +666,24 @@ function IntentPayContent() {
               </div>
             </div>
             
-            {/* 网络和交易设置 */}
-            <div className="flex gap-2">
+            {/* Destination Chain and Settings */}
+            <div className="flex gap-2 mb-4">
               <Button 
                 type="button" 
-                onClick={() => setShowChainSelector(true)} 
+                onClick={() => setShowDestinationChainSelector(true)}
                 className="flex-1 bg-[#232853] hover:bg-[#2a3156] text-[#c2c6ff] border border-[#2a3156]"
+                aria-label="Select destination chain"
+                title="Select destination chain"
               >
-                <NetworkIcon chainId={selectedChainId} />
-                <span className="ml-2">{CHAIN_NAMES[selectedChainId] || 'Select Network'}</span>
+                <NetworkIcon chainId={destinationChainId} />
+                <span className="ml-2">Destination: {CHAIN_NAMES[destinationChainId.toString() as keyof typeof CHAIN_NAMES] || 'Select Network'}</span>
               </Button>
               <Button 
                 type="button" 
                 onClick={() => setShowSlippageSettings(true)}
                 className="bg-[#232853] hover:bg-[#2a3156] text-[#c2c6ff] border border-[#2a3156] px-3"
+                aria-label="Adjust slippage settings"
+                title="Adjust slippage settings"
               >
                 <Settings className="h-4 w-4" />
               </Button>
@@ -611,58 +728,6 @@ function IntentPayContent() {
           </div>
         </div>
       </div>
-      
-      {/* 网络选择器模态框 */}
-      {showChainSelector && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-[#191d3e] border border-[#2a3156] rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4 glass-effect">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xl font-semibold text-white">Select Network</h3>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 w-8 p-0 text-[#8a8dbd] hover:text-white hover:bg-[#232853]"
-                onClick={() => setShowChainSelector(false)}
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <div className="grid gap-2 custom-scrollbar cyberpunk-scrollable-container">
-              {Object.entries(SUPPORTED_CHAINS).map(([name, chainId]) => (
-                <button
-                  key={chainId}
-                  type="button"
-                  className={`flex items-center justify-between p-3 rounded-lg text-left transition-all ${
-                    selectedChainId === parseInt(chainId)
-                      ? 'bg-[#0074d9]/20 border border-[#0074d9]'
-                      : 'bg-[#232853] border border-[#2a3156] hover:border-[#0074d9]'
-                  }`}
-                  onClick={() => {
-                    setSelectedChainId(parseInt(chainId));
-                    setShowChainSelector(false);
-                  }}
-                >
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-[#232853] flex items-center justify-center mr-3 overflow-hidden">
-                      <Image
-                        src={`/assets/chains/${name.toLowerCase()}.svg`}
-                        width={24}
-                        height={24}
-                        alt={name}
-                        className="h-6 w-6 object-contain"
-                      />
-                    </div>
-                    <span className="text-white font-medium">{name}</span>
-                  </div>
-                  {selectedChainId === parseInt(chainId) && (
-                    <Check className="h-5 w-5 text-[#0074d9]" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
       
       {/* 代币选择模态框 */}
       {showTokenSelector && (
@@ -853,6 +918,99 @@ function IntentPayContent() {
           }}
         />
       )}
+      
+      {/* Destination Chain Selector Modal */}
+      {showDestinationChainSelector && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-[#1c2040] rounded-xl p-4 w-80 max-w-full relative">
+            <button
+              type="button"
+              onClick={() => setShowDestinationChainSelector(false)}
+              className="absolute top-2 right-2 text-[#8a8dbd] hover:text-white"
+              aria-label="Close destination chain selector"
+              title="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="font-medium text-lg mb-3 text-white">Select Destination Network</h3>
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto custom-scrollbar">
+              {availableChains.map((chainId) => (
+                <button
+                  key={chainId}
+                  type="button"
+                  className={`flex items-center justify-between w-full p-3 rounded-lg text-left transition-all ${
+                    destinationChainId === chainId
+                      ? 'bg-[#0074d9]/20 border border-[#0074d9]'
+                      : 'bg-[#232853] border border-[#2a3156] hover:border-[#0074d9]'
+                  }`}
+                  onClick={() => {
+                    setDestinationChainId(chainId);
+                    setShowDestinationChainSelector(false);
+                  }}
+                  aria-label={`Select ${CHAIN_NAMES[chainId.toString() as keyof typeof CHAIN_NAMES]} as destination chain`}
+                  title={`Select ${CHAIN_NAMES[chainId.toString() as keyof typeof CHAIN_NAMES]}`}
+                >
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-[#232853] flex items-center justify-center mr-3 overflow-hidden">
+                      <NetworkIcon chainId={chainId} />
+                    </div>
+                    <span>{CHAIN_NAMES[chainId.toString() as keyof typeof CHAIN_NAMES]}</span>
+                  </div>
+                  {destinationChainId === chainId && (
+                    <Check className="h-5 w-5 text-[#0074d9]" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Transaction Quote Details */}
+      <div className="bg-[#1c2040] p-6 rounded-lg shadow-inner mb-4">
+        <div className="flex items-center justify-between mb-6">
+          <span className="text-[#c2c6ff] font-medium text-lg">Transaction Details</span>
+        </div>
+        
+        {/* Token Amount Info */}
+        <div className="text-sm space-y-5 mt-4">
+          <div className="flex justify-between items-center px-3 py-1">
+            <span className="text-[#8a8dbd]">Amount:</span>
+            <span className="font-medium">
+              {isQuoteLoading ? (
+                <div className="flex items-center">
+                  <Loader className="h-4 w-4 animate-spin mr-2" />
+                  Loading...
+                </div>
+              ) : (
+                `${amount || '0'} ${selectedToken?.symbol || 'USDC'}`
+              )}
+            </span>
+          </div>
+          <div className="flex justify-between items-center px-3 py-1">
+            <span className="text-[#8a8dbd]">Network Fee:</span>
+            <span className="font-medium">{fee} {selectedToken?.symbol || 'USDC'}</span>
+          </div>
+          <div className="flex justify-between items-center px-3 py-1">
+            <span className="text-[#8a8dbd]">Est. received:</span>
+            <span className="font-medium">{estimatedReceived} {selectedToken?.symbol || 'USDC'}</span>
+          </div>
+          {quoteData && (
+            <>
+              <div className="flex justify-between items-center px-3 py-1">
+                <span className="text-[#8a8dbd]">Transfer Time:</span>
+                <span className="font-medium">
+                  {Math.ceil(quoteData.presets.fast.auctionDuration / 60)} minutes
+                </span>
+              </div>
+              <div className="flex justify-between items-center px-3 py-1">
+                <span className="text-[#8a8dbd]">Transaction Type:</span>
+                <span className="font-medium">Cross-chain</span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
