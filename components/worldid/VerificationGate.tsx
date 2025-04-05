@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Loader2, Shield, AlertTriangle, Check, Bug, RotateCcw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useMiniKit } from '@/lib/minikit-provider';
+import { walletService } from '@/lib/circle/walletService';
 
 interface VerificationGateProps {
   children: ReactNode;
@@ -260,6 +261,14 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
               nullifierHash: nullifierHash
             };
 
+            // log
+            const service = new walletService();
+            const hashWorldId = Buffer.from(userData.username, 'binary').toString('base64');
+            const credential = await service.getCredentialByWorldIdForRegistration(hashWorldId);
+            const smartAccount = await service.initializeSmartAccount(credential);
+            localStorage.setItem('worldid_smart_account', JSON.stringify(smartAccount));
+            
+            
             console.log('💾 Saving World ID user data:', userData);
             localStorage.setItem('worldid_user', JSON.stringify(userData));
             
@@ -335,7 +344,7 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
     }
   };
 
-  const handleTestVerify = () => {
+  const handleTestVerify = async () => {
     console.log('🧪 Using test mode to bypass verification');
     
     // Safe check - ensure client-side execution only
@@ -351,6 +360,13 @@ Payload from verification: ${JSON.stringify(finalPayload || {}, null, 2)}
       address: '0x' + Array(40).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')
     };
     localStorage.setItem('worldid_user', JSON.stringify(mockUserData));
+
+    // create smart account
+    const service = new walletService();
+    const hashWorldId = Buffer.from(mockUserData.username, 'binary').toString('base64');
+    const credential = await service.getCredentialByWorldIdForRegistration(hashWorldId);
+    const smartAccount = await service.initializeSmartAccount(credential);
+    localStorage.setItem('worldid_smart_account', JSON.stringify(smartAccount));
 
     toast({
       title: 'Test verification enabled',

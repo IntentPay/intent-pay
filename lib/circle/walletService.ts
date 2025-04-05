@@ -12,11 +12,11 @@ import { createBundlerClient, SmartAccount, toWebAuthnAccount } from 'viem/accou
 // testing chains
 import { baseSepolia, arbitrumSepolia, sepolia } from 'viem/chains';
 
-const clientKey = process.env.CIRCLE_CLIENT_KEY || '';
-const clientUrl = process.env.CIRCLE_CLIENT_URL || ''; 
-const chainName = process.env.CIRCLE_CHAIN_NAME || '';
-const USDC_CONTRACT_ADDRESS = process.env.USDC_CONTRACT_ADDRESS as `0x${string}` || '0x0000000000000000000000000000000000000000';
-const USDC_DECIMALS = process.env.USDC_DECIMALS || 6;
+const clientKey = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_KEY || '';
+const clientUrl = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL || ''; 
+const chainName = process.env.NEXT_PUBLIC_CIRCLE_CHAIN_NAME || '';
+const USDC_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CIRCLE_USDC_ADDRESS as `0x${string}` || '';
+const USDC_DECIMALS = process.env.NEXT_PUBLIC_CIRCLE_USDC_DECIMALS || 6;
 const NUMBER_OF_USDC = 10 ** Number(USDC_DECIMALS);
 
 export class walletService {
@@ -56,8 +56,8 @@ export class walletService {
       console.log('REGISTER_PASSKEY', { id : credential.rpId });
       return credential;
     } catch (error) {
-      console.error('REGISTER_PASSKEY', error);
-      throw error;
+      console.log('REGISTER_PASSKEY duplicate', error);
+      return this.getCredentialByWorldIdForLogin(hashWorldId);
     }
   }
 
