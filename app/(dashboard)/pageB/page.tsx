@@ -44,7 +44,7 @@ export default function PageB() {
     }
   };
   return (
-    <div className="flex justify-center items-start min-h-screen bg-muted px-4 pt-12 sm:pt-20">
+    <div className="flex justify-center items-start min-h-screen bg-muted px-2 sm:pt-20">
       <Card className="w-full max-w-lg shadow-xl">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-2">
