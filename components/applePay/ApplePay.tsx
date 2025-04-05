@@ -58,11 +58,9 @@ const ApplePayButton: React.FC<ApplePayButtonProps> = ({ amount, label }) => {
       // 定義 PaymentOptions
       const paymentOptions = {
         requestPayerName: false,
-        requestBillingAddress: false,
         requestPayerEmail: false,
         requestPayerPhone: false,
         requestShipping: false,
-        shippingType: 'shipping'
       };
 
       // 創建 PaymentRequest
