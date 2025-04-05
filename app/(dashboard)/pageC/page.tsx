@@ -1,3 +1,8 @@
+'use client';
+
+import { useState } from 'react';
+import { getSupportedChains, getSupportedProtocols } from '@/lib/1inch/portfolio';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import ApplePayButton from '@/components/applePay/ApplePay';
 
@@ -13,5 +18,4 @@ export default function PageC() {
         <ApplePayButton amount="27.50" label="Demo (Card is not charged)" />
       </CardContent>
     </Card>
-  );
-}
+} 
