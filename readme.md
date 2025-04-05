@@ -66,6 +66,24 @@ intent-pay/
 └── config files                 # Configuration files
 ```
 
+## High Level Design 
+
+```mermaid
+flowchart TD
+    IntentPay[IntentPay Mini App\nComplete application with user interface & direct API integrations]
+    
+    World[World Server\nProvides identity verification & payment infrastructure]
+    Circle[Circle Server\nOffers modular wallet technology & cross-chain transfers]
+    OneInch[1inch Server\nDelivers optimal token swap routes & execution]
+    Blockchain[Blockchains\nExecute transactions across multiple networks]
+    
+    IntentPay --> World
+    IntentPay --> Circle
+    IntentPay --> OneInch
+    Circle --> Blockchain
+    OneInch --> Blockchain
+```
+
 ## Installation and Setup
 
 ### Prerequisites
