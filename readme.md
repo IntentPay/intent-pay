@@ -27,8 +27,6 @@ We create a frictionless financial experience that removes the complexity of gas
   Submit trade intentions that get executed optimally via 1inch
 - **👋 Human Verification**:
   Privacy-preserving verification using World ID and zero-knowledge proofs
-- **💻 Seamless Multi-Device Support**:
-  Deliver a smooth experience across various devices, ensuring universal access and compatibility.
 - **🤖 Immersive Haptic Feedback**:
   Enhance user interactions with responsive tactile feedback, making the experience more engaging and satisfying. This feature is designed to improve accessibility for visually impaired users and enrich the overall user experience.
 - **𖢻 Multi-chain Support**:
