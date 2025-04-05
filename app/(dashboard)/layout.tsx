@@ -13,7 +13,7 @@ import {
   BreadcrumbSeparator
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { User } from './user';
 import { VercelLogo } from '@/components/icons';
@@ -114,6 +114,8 @@ function MobileNav() {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="sm:max-w-xs">
+        {/* className="sr-only" will not display but still work with "aria-labelledby" */}
+        <SheetTitle className="sr-only">Mobile Navigation</SheetTitle>
         <nav className="grid gap-6 text-lg font-medium">
           <Link
             href="https://docs.world.org/world-chain"
