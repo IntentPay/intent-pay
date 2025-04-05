@@ -31,7 +31,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
               <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
                 <MobileNav />
-                <DashboardBreadcrumb />
+                <DashboardBrandHeader />
                 <SearchInput />
                 <User />
               </header>
@@ -163,5 +163,19 @@ function DashboardBreadcrumb() {
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
+  );
+}
+
+function DashboardBrandHeader() {
+  return (
+    <div className="flex items-center gap-4">
+      <img src="/assets/IntentPay_header.jpg" alt="IntentPay Logo" className="h-10 w-auto rounded shadow-md" />
+
+      <div className="hidden md:flex flex-col">
+        <p className="text-sm text-muted-foreground -mt-1 text-center line-clamp-2">
+          Driven by Purpose Powered by Simplicity
+        </p>
+      </div>
+    </div>
   );
 }
