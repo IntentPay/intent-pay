@@ -209,7 +209,9 @@ function DashboardBreadcrumb() {
 function DashboardBrandHeader() {
   return (
     <div className="flex items-center gap-4">
-      <img src="/assets/IntentPay_header.jpg" alt="IntentPay Logo" className="h-10 w-auto rounded shadow-md" />
+      <Link href="/">
+        <img src="/assets/IntentPay_header.jpg" alt="IntentPay Logo" className="h-10 w-auto rounded shadow-md" />
+      </Link>
 
       <div className="hidden md:flex flex-col">
         <p className="text-sm text-muted-foreground -mt-1 text-center line-clamp-2">
