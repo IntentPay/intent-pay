@@ -165,12 +165,12 @@ export async function getCrossChainQuote(
       walletAddress,
       enableEstimate: (options?.enableEstimate ?? false).toString()
     };
-    
+
     // Add optional parameters if provided
     if (options?.fee !== undefined) params.fee = options.fee.toString();
     if (options?.isPermit2) params.isPermit2 = options.isPermit2;
     if (options?.permit) params.permit = options.permit;
-    
+
     const response = await axios.get('/api/1inch/fusion-plus/quoter', { params });
     return response.data;
   } catch (error) {
