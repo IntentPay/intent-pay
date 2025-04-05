@@ -30,11 +30,21 @@ export function QRScannerModal({ onClose, onResult }: QRScannerModalProps) {
 
     // 檢查是否為以太坊地址
     const ethAddressRegex = /^(0x)?[0-9a-fA-F]{40}$/;
+    
+    // 安全处理地址格式
     let address = result;
+    
+    // 处理可能的格式，如ethereum:0x...
+    if (result.includes(':')) {
+      const parts = result.split(':');
+      if (parts.length > 1 && parts[1]) {
+        address = parts[1];
+      }
+    }
 
-    if (ethAddressRegex.test(result)) {
+    if (ethAddressRegex.test(address)) {
       // 確保地址包含0x前綴
-      address = result.startsWith('0x') ? result : `0x${result}`;
+      address = address.startsWith('0x') ? address : `0x${address}`;
     }
 
     // 延遲一下以顯示載入狀態
