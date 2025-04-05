@@ -16,8 +16,8 @@ export default function PageB() {
       to: '0x67aad1351bb0665d2a560a52bef9ab8621567d25', // Test address
       tokens: [
         {
-          symbol: Tokens.USDCE,
-          token_amount: tokenToDecimals(0.5, Tokens.USDCE).toString()
+          symbol: Tokens.WLD,
+          token_amount: tokenToDecimals(0.05, Tokens.WLD).toString()
         }
       ],
       description: 'Pay for IntentPay'

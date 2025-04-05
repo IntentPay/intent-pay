@@ -82,12 +82,12 @@ intent-pay/
 ```mermaid
 flowchart TD
     IntentPay[**IntentPay Mini App** - Complete application with user interface & direct API integrations]
-
+    
     World[**World Server** - Provides identity verification & payment infrastructure]
-    Circle[**Circle Server** - Offers modular wallet technology & cross-chain transfers]
+    Circle[**Circle Server** - Offers Paymaster for gasless transactions & CCTPv2 for cross-chain]
     OneInch[**1inch Server** - Delivers optimal token swap routes & execution]
     Blockchain[**Blockchains** - Execute transactions across multiple networks]
-
+    
     IntentPay --> World
     IntentPay --> Circle
     IntentPay --> OneInch
