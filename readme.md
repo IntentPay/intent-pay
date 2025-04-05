@@ -15,15 +15,28 @@ We create a frictionless financial experience that removes the complexity of gas
 
 ## Core Features
 
-- **USDC-Priced Cross-Chain Swaps**: All transactions priced in USDC regardless of destination chain or token
-- **World App Payment Integration**: Pay for swaps directly through World App without connecting personal wallets
-- **QR Code Address Scanning**: Easily input recipient addresses by scanning QR codes
-- **Gasless Transactions**: Execute transfers without managing gas fees using IntentPay's official Circle wallet
-- **Intent-Based Trading**: Submit trade intentions that get executed optimally via 1inch
-- **Human Verification**: Privacy-preserving verification using World ID and zero-knowledge proofs
-- **Multi-chain Support**: Transact across multiple blockchains seamlessly
-- **Enhanced Security**: Passkey authentication and risk-based transaction screening
-- **Portfolio Tracking**: View balances and transaction history across supported chains
+- **USDC-Priced Cross-Chain Swaps**:
+  All transactions priced in USDC regardless of destination chain or token
+- **World App Payment Integration**:
+  Pay for swaps directly through World App without connecting personal wallets
+- **QR Code Address Scanning**:
+  Easily input recipient addresses by scanning QR codes
+- **Gasless Transactions**:
+  Execute transfers without managing gas fees using IntentPay's official Circle wallet
+- **Intent-Based Trading**:
+  Submit trade intentions that get executed optimally via 1inch
+- **Human Verification**:
+  Privacy-preserving verification using World ID and zero-knowledge proofs
+- **Seamless Multi-Device Support**:
+  Deliver a smooth experience across various devices, ensuring universal access and compatibility.
+- **Immersive Haptic Feedback**:
+  Enhance user interactions with responsive tactile feedback, making the experience more engaging and satisfying. This feature is designed to improve accessibility for visually impaired users and enrich the overall user experience.
+- **Multi-chain Support**:
+  Transact across multiple blockchains seamlessly
+- **Enhanced Security**:
+  Passkey authentication and risk-based transaction screening
+- **Portfolio Tracking**:
+  View balances and transaction history across supported chains
 
 ## Technical Architecture
 
@@ -66,17 +79,17 @@ intent-pay/
 └── config files                 # Configuration files
 ```
 
-## High Level Design 
+## System Architecture Overview
 
 ```mermaid
 flowchart TD
-    IntentPay[IntentPay Mini App   Complete application with user interface & direct API integrations]
-    
-    World[World Server   Provides identity verification & payment infrastructure]
-    Circle[Circle Server   Offers modular wallet technology & cross-chain transfers]
-    OneInch[1inch Server   Delivers optimal token swap routes & execution]
-    Blockchain[Blockchains   Execute transactions across multiple networks]
-    
+    IntentPay[**IntentPay Mini App** - Complete application with user interface & direct API integrations]
+
+    World[**World Server** - Provides identity verification & payment infrastructure]
+    Circle[**Circle Server** - Offers modular wallet technology & cross-chain transfers]
+    OneInch[**1inch Server** - Delivers optimal token swap routes & execution]
+    Blockchain[**Blockchains** - Execute transactions across multiple networks]
+
     IntentPay --> World
     IntentPay --> Circle
     IntentPay --> OneInch
