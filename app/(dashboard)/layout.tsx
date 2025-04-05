@@ -7,8 +7,7 @@ import {
   Home,
   LineChart,
   Locate,
-  Package,
-  Package2,
+  DollarSign,
   PanelLeft,
   Settings,
   ShoppingCart,
@@ -29,13 +28,14 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { User } from './user';
-import { VercelLogo } from '@/components/icons';
 import Providers from './providers';
 import { NavItem } from './nav-item';
 import { SearchInput } from './search';
 import { Toaster } from '@/components/ui/toaster';
 import MiniKitProvider from '@/lib/minikit-provider';
 import { VerificationGate } from '@/components/worldid/VerificationGate';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -67,14 +67,14 @@ function DesktopNav() {
     <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
       <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
         <Link
-          href="https://docs.world.org/world-chain"
+          href="/"
           className="group flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:h-8 md:w-8 md:text-base"
         >
-          <VercelLogo className="h-3 w-3 transition-all group-hover:scale-110" />
+          <img src="/assets/logo.png" alt="IntentPay Logo" className="h-10 w-auto rounded shadow-md" />
           <span className="sr-only">IntentPay Team</span>
         </Link>
 
-        <NavItem href="/analytics" label="Dashboard">
+        <NavItem href="/" label="Dashboard">
           <Home className="h-5 w-5" />
         </NavItem>
 
@@ -83,7 +83,7 @@ function DesktopNav() {
         </NavItem>
 
         <NavItem href="/pageB" label="World Payment">
-          <Package className="h-5 w-5" />
+          <DollarSign className="h-5 w-5" />
         </NavItem>
 
         <NavItem href="/pageC" label="PageC">
@@ -132,14 +132,14 @@ function MobileNav() {
         <SheetTitle className="sr-only">Mobile Navigation</SheetTitle>
         <nav className="grid gap-6 text-lg font-medium">
           <Link
-            href="https://docs.world.org/world-chain"
+            href="/"
             className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:text-base"
           >
-            <Package2 className="h-5 w-5 transition-all group-hover:scale-110" />
+            <img src="/assets/logo.png" alt="IntentPay Logo" className="h-10 w-auto rounded shadow-md" />
             <span className="sr-only">IntentPay Team</span>
           </Link>
           <Link
-            href="/analytics"
+            href="/"
             onClick={handleLinkClick}
             className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
           >
@@ -155,7 +155,7 @@ function MobileNav() {
             PageA
           </Link>
           <Link href="/pageB" onClick={handleLinkClick} className="flex items-center gap-4 px-2.5 text-foreground">
-            <Package className="h-5 w-5" />
+            <DollarSign className="h-5 w-5" />
             World Payment
           </Link>
           <Link
@@ -207,7 +207,9 @@ function DashboardBreadcrumb() {
 function DashboardBrandHeader() {
   return (
     <div className="flex items-center gap-4">
-      <img src="/assets/IntentPay_header.jpg" alt="IntentPay Logo" className="h-10 w-auto rounded shadow-md" />
+      <Link href="/">
+        <img src="/assets/IntentPay_header.jpg" alt="IntentPay Logo" className="h-10 w-auto rounded shadow-md" />
+      </Link>
 
       <div className="hidden md:flex flex-col">
         <p className="text-sm text-muted-foreground -mt-1 text-center line-clamp-2">
@@ -222,32 +224,75 @@ function DashboardBrandHeader() {
  * Bottom Navigation Bar
  */
 function MobileBottomNav() {
+  const pathname = usePathname();
+
+  const navItems = [
+    { href: '/', label: 'Home', icon: Home },
+    { href: '/swap', label: 'Wallet', icon: Wallet },
+    { href: '/track', label: 'Track', icon: Locate },
+    { href: '/card', label: 'Card', icon: CreditCard }
+  ];
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 mx-auto flex h-16 max-w-md items-center justify-around rounded-t-xl border-t bg-white shadow-lg sm:hidden">
-      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-        <Home className="w-5 h-5" />
-        <span className="text-xs">Home</span>
-      </button>
+    <nav
+      className={cn(
+        'fixed bottom-0 left-0 right-0 z-50 mx-auto flex h-16 max-w-md items-center justify-around sm:hidden',
+        'rounded-t-xl border-t',
+        "bg-[url('/assets/brushed-alum.png')]",
+        'bg-[#d1c4d5c4]',
+        'bg-cover bg-no-repeat bg-center',
+        'shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_2px_5px_rgba(0,0,0,0.08)]',
+        'backdrop-blur-sm backdrop-saturate-150 border-zinc-300 px-4'
+      )}
+    >
+      {navItems.slice(0, 2).map((item) => {
+        const Icon = item.icon;
+        const active = pathname === item.href;
 
-      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-        <Wallet className="w-5 h-5" />
-        <span className="text-xs">Wallet</span>
-      </button>
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              'flex flex-col items-center justify-center px-2 py-1 transition-all',
+              'rounded-md text-xs',
+              active
+                ? 'bg-gray-200 text-black shadow-inner font-medium'
+                : 'text-gray-500 hover:bg-gray-100 hover:shadow'
+            )}
+          >
+            <Icon className={cn('w-5 h-5 mb-0.5', active ? 'text-indigo-600' : '')} />
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
 
-      {/* 中間 Logo */}
+      {/* Middle Logo */}
       <div className="flex h-12 w-12 -mt-10 items-center justify-center rounded-full border bg-white shadow-md">
         <Circle className="h-6 w-6 text-indigo-600" />
       </div>
 
-      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-        <Locate className="w-5 h-5" />
-        <span className="text-xs">Track</span>
-      </button>
+      {navItems.slice(2).map((item) => {
+        const Icon = item.icon;
+        const active = pathname === item.href;
 
-      <button className="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-        <CreditCard className="w-5 h-5" />
-        <span className="text-xs">Card</span>
-      </button>
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              'flex flex-col items-center justify-center px-2 py-1 transition-all',
+              'rounded-md text-xs',
+              active
+                ? 'bg-gray-200 text-black shadow-inner font-medium'
+                : 'text-gray-500 hover:bg-gray-100 hover:shadow'
+            )}
+          >
+            <Icon className={cn('w-5 h-5 mb-0.5', active ? 'text-indigo-600' : '')} />
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
     </nav>
   );
 }

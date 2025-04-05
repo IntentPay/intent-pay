@@ -32,12 +32,19 @@ export function User() {
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Settings</span>
+          <Link href="/setting" className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground">
+            <Settings className="mr-2 h-4 w-4" />
+            Settings
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem>
-          <HelpCircle className="mr-2 h-4 w-4" />
-          <span>Support</span>
+          <Link
+            href="https://docs.world.org/world-chain"
+            className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+          >
+            <HelpCircle className="mr-2 h-4 w-4" />
+            Support
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => signOut('/')}>
