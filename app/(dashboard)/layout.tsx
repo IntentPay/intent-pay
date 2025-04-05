@@ -2,19 +2,20 @@
 
 import { useState } from 'react';
 import {
-  Circle,
-  CreditCard,
   Home,
-  LineChart,
-  Locate,
+  CreditCard,
   DollarSign,
+  LineChart,
+  Circle,
   PanelLeft,
   Settings,
   ShoppingCart,
   Users2,
-  Wallet
+  Wallet,
+  Locate
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 
 import {
   Breadcrumb,
@@ -30,14 +31,20 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { User } from './user';
 import Providers from './providers';
 import { NavItem } from './nav-item';
-import { SearchInput } from './search';
 import { Toaster } from '@/components/ui/toaster';
-import MiniKitProvider from '@/lib/minikit-provider';
+import MiniKitProvider, { useMiniKit } from '@/lib/minikit-provider';
 import { VerificationGate } from '@/components/worldid/VerificationGate';
-import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { QRScannerModal } from '@/components/qr/QRScanner';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  
+  // 關閉 QR 掃描器的處理函數
+  const handleCloseQRScanner = () => {
+    setShowQRScanner(false);
+  };
+  
   return (
     <MiniKitProvider>
       <Providers>
@@ -45,16 +52,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <main className="flex min-h-screen w-full flex-col bg-muted/40">
             <DesktopNav />
             <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
-              <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
+              <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
                 <MobileNav />
                 <DashboardBrandHeader />
-                <SearchInput />
-                <User />
+                <div className="ml-auto flex w-full items-center justify-end gap-2">
+                  <User />
+                </div>
               </header>
               <main className="grid flex-1 items-start gap-2 p-4 sm:px-6 sm:py-0 md:gap-4 bg-muted/40">{children}</main>
             </div>
+            <MobileBottomNav onOpenQRScanner={() => setShowQRScanner(true)} />
             <Toaster />
-            <MobileBottomNav />
+            {showQRScanner && <QRScannerModal onClose={handleCloseQRScanner} />}
           </main>
         </VerificationGate>
       </Providers>
@@ -206,13 +215,13 @@ function DashboardBreadcrumb() {
 
 function DashboardBrandHeader() {
   return (
-    <div className="flex items-center gap-4">
-      <Link href="/">
-        <img src="/assets/IntentPay_header.jpg" alt="IntentPay Logo" className="h-10 w-auto rounded shadow-md" />
+    <div className="flex flex-1 items-center justify-center">
+      <Link href="/" className="flex items-center">
+        <img src="/assets/IntentPay_header.jpg" alt="IntentPay Logo" className="h-10 md:h-12 w-auto rounded shadow-md object-contain" />
       </Link>
 
-      <div className="hidden md:flex flex-col">
-        <p className="text-sm text-muted-foreground -mt-1 text-center line-clamp-2">
+      <div className="hidden md:flex flex-col ml-3">
+        <p className="text-sm text-muted-foreground text-center line-clamp-2">
           Driven by Purpose Powered by Simplicity
         </p>
       </div>
@@ -220,17 +229,34 @@ function DashboardBrandHeader() {
   );
 }
 
-/**
- * Bottom Navigation Bar
- */
-function MobileBottomNav() {
+interface MobileBottomNavProps {
+  onOpenQRScanner: () => void;
+}
+
+function MobileBottomNav({ onOpenQRScanner }: MobileBottomNavProps) {
   const pathname = usePathname();
+  const miniKit = useMiniKit();
+  
+  // 處理掃描QR碼按鈕點擊
+  const handleScanClick = async () => {
+    try {
+      // 重置先前的授權狀態，確保每次都顯示確認視窗
+      localStorage.removeItem('wallet_auth_data');
+      localStorage.removeItem('wallet_auth_signed_in');
+      localStorage.removeItem('wallet_address');
+      
+      // 打開 QR 掃描器
+      onOpenQRScanner();
+    } catch (error) {
+      console.error('Error handling scan click:', error);
+    }
+  };
 
   const navItems = [
     { href: '/', label: 'Home', icon: Home },
-    { href: '/swap', label: 'Wallet', icon: Wallet },
-    { href: '/track', label: 'Track', icon: Locate },
-    { href: '/card', label: 'Card', icon: CreditCard }
+    { href: '/intent-pay', label: 'Intent Pay', icon: CreditCard },
+    { href: '/pageB', label: 'World Pay', icon: DollarSign },
+    { href: '/setting', label: 'Settings', icon: Settings },
   ];
 
   return (
@@ -267,10 +293,16 @@ function MobileBottomNav() {
         );
       })}
 
-      {/* Middle Logo */}
-      <div className="flex h-12 w-12 -mt-10 items-center justify-center rounded-full border bg-white shadow-md">
+      {/* Middle Logo - 添加點擊處理 */}
+      <button 
+        onClick={handleScanClick}
+        className="flex h-12 w-12 -mt-10 items-center justify-center rounded-full border bg-white shadow-md hover:bg-gray-50 active:shadow-inner transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
+        aria-label="掃描 QR 碼並重置錢包授權"
+        title="掃描 QR 碼並重置錢包授權"
+      >
         <Circle className="h-6 w-6 text-indigo-600" />
-      </div>
+        <span className="sr-only">掃描 QR 碼</span>
+      </button>
 
       {navItems.slice(2).map((item) => {
         const Icon = item.icon;
