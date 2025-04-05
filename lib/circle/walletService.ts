@@ -22,19 +22,39 @@ const NUMBER_OF_USDC = 10 ** Number(USDC_DECIMALS);
 export class walletService {
   private publicClient: any = null;
   private modularTransport: any = null;
-
   private passkeyTransport: any = null;
 
   constructor() {
-    this.modularTransport = toModularTransport(
-      `${clientUrl}/${chainName}`,
-      clientKey
-    );
-    this.publicClient = createPublicClient({
-      chain: arbitrumSepolia,
-      transport: this.modularTransport as Transport,
-    });
-    this.passkeyTransport = toPasskeyTransport(clientUrl, clientKey);
+    try {
+      // Log configuration for debugging
+      console.log('Initializing wallet service with config:', {
+        clientUrl: clientUrl ? `${clientUrl.substring(0, 10)}...` : 'Not set',
+        chainName: chainName || 'Not set',
+        clientKeyExists: !!clientKey,
+      });
+      
+      // Check if required configuration is available
+      if (!clientUrl || !chainName || !clientKey) {
+        console.error('Missing Circle wallet configuration. Check your environment variables.');
+        return;
+      }
+      
+      this.modularTransport = toModularTransport(
+        `${clientUrl}/${chainName}`,
+        clientKey
+      );
+      
+      this.publicClient = createPublicClient({
+        chain: arbitrumSepolia,
+        transport: this.modularTransport as Transport,
+      });
+      
+      this.passkeyTransport = toPasskeyTransport(clientUrl, clientKey);
+      
+      console.log('Wallet service initialized successfully');
+    } catch (error) {
+      console.error('Error initializing wallet service:', error);
+    }
   }
 
   /**
@@ -44,6 +64,10 @@ export class walletService {
    */
   async getCredentialByWorldIdForRegistration(hashWorldId: string) {
     try {
+      if (!this.passkeyTransport) {
+        throw new Error('Wallet service not properly initialized');
+      }
+      
       console.log('REGISTER_PASSKEY', { walletUniqueKey: hashWorldId });
       
       const credential = await toWebAuthnCredential({
@@ -73,6 +97,10 @@ export class walletService {
     }
     
     try {
+      if (!this.passkeyTransport) {
+        throw new Error('Wallet service not properly initialized');
+      }
+      
       console.log('LOGIN_PASSKEY', { username: hashWorldId });
 
       let credential;
@@ -99,24 +127,34 @@ export class walletService {
   }
 
   /**
-   * 1. Get Crendential first then initialize Smart Account
-   * 2. Initialize Smart Account
-   * @param credential - The credential for the passkey
-   * @returns The smart account
+   * Initialize Smart Account
+   * @param credential - Credential for the passkey
+   * @returns SmartAccount
    */
   async initializeSmartAccount(credential: any) {
     try {
-      console.log(`INITIALIZE_SMART_ACCOUNT ${credential}`);
-
-      const smartAccount = await toCircleSmartAccount({
+      if (!this.modularTransport || !this.publicClient) {
+        throw new Error('Wallet service not properly initialized');
+      }
+      
+      const account = await toCircleSmartAccount({
         client: this.publicClient as Client,
         owner: toWebAuthnAccount({
-            credential,
+          credential,
         }),
       });
 
-      console.log('INITIALIZE_SMART_ACCOUNT', { smartAccount });
-      return smartAccount;
+      const bundlerClient = await createBundlerClient({
+        chain: arbitrumSepolia,
+        transport: this.modularTransport as Transport,
+        account: account as SmartAccount,
+      });
+
+      return {
+        account,
+        address: account.address,
+        bundlerClient,
+      };
     } catch (error) {
       console.error('INITIALIZE_SMART_ACCOUNT', error);
       throw error;
@@ -132,11 +170,11 @@ export class walletService {
    */
   async sendUSDCTransfer(recipientAddress: string, amount: string, smartAccount: any) {
     try {
-      console.log('SEND_USDC_TRANSFER', { recipientAddress, amount: amount.toString() });
-
       if (!this.publicClient || !smartAccount) {
         throw new Error('Smart account not initialized');
       }
+      
+      console.log('SEND_USDC_TRANSFER', { recipientAddress, amount: amount.toString() });
 
       const bundlerClient = createBundlerClient({
           account: smartAccount as SmartAccount,

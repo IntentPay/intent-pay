@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Web3Avatar } from '@/components/wallet/Web3Avatar';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/use-toast';
-import Image from 'next/image';
 import { QRScannerModal } from '@/components/qr/QRScanner';
 import { MiniKit } from '@worldcoin/minikit-js';
+import { getUsdcTokenInfo, TokenInfoDto } from '@/lib/1inch/token';
 
 // Send haptic feedback
 const sendHapticHeavyCommand = () =>
@@ -27,7 +27,7 @@ const CHAIN_TOKEN_MAPPING = {
   '8453': ['ETH', 'USDC', 'USDT'], // Base
 };
 
-// Supported tokens list
+// Supported tokens list with default values
 const SUPPORTED_TOKENS = {
   'USDC': { symbol: 'USDC', name: 'USD Coin', decimals: 6, logo: '/assets/tokens/usdc.svg' },
   'ETH': { symbol: 'ETH', name: 'Ethereum', decimals: 18, logo: '/assets/tokens/eth.svg' },
@@ -48,13 +48,6 @@ const SUPPORTED_CHAINS = [
 
 // Default slippage
 const DEFAULT_SLIPPAGE = 0.5;
-
-// Truncate address display
-const truncateAddress = (address: string, start = 6, end = 4) => {
-  if (!address) return '';
-  if (address.length <= start + end) return address;
-  return `${address.slice(0, start)}...${address.slice(-end)}`;
-};
 
 // Component wrapping useSearchParams
 function IntentPayContent() {
@@ -77,6 +70,7 @@ function IntentPayContent() {
   const [showChainSelector, setShowChainSelector] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [sourceTokenInfo, setSourceTokenInfo] = useState<TokenInfoDto | null>(null);
   
   // Get current selected chain
   const selectedChain = SUPPORTED_CHAINS.find(chain => chain.id === selectedChainId);
@@ -85,6 +79,22 @@ function IntentPayContent() {
   const availableTokens = selectedChainId 
     ? CHAIN_TOKEN_MAPPING[selectedChainId as keyof typeof CHAIN_TOKEN_MAPPING].map(symbol => SUPPORTED_TOKENS[symbol as keyof typeof SUPPORTED_TOKENS])
     : [];
+  
+  // Load USDC token info using 1inch API
+  useEffect(() => {
+    async function loadUsdcTokenInfo() {
+      try {
+        const usdcInfo = await getUsdcTokenInfo(parseInt(selectedChainId));
+        if (usdcInfo) {
+          setSourceTokenInfo(usdcInfo);
+        }
+      } catch (error) {
+        console.error('Error loading USDC token info:', error);
+      }
+    }
+    
+    loadUsdcTokenInfo();
+  }, [selectedChainId]);
   
   // Initialize with first available token
   useEffect(() => {
@@ -165,12 +175,14 @@ function IntentPayContent() {
   // Handle QR scan result
   const handleQRResult = (result: string) => {
     if (result) {
-      setRecipientAddress(result);
+      // 去除可能存在的"ethereum:"前缀
+      const cleanAddress = result.replace(/^ethereum:/i, '');
+      setRecipientAddress(cleanAddress);
       setShowQRScanner(false);
       
       toast({
         title: "Address Scanned",
-        description: `Address ${truncateAddress(result)} has been added`,
+        description: "Address has been added successfully",
       });
     }
   };
@@ -188,7 +200,7 @@ function IntentPayContent() {
         </div>
         <h1 className="text-2xl font-bold mb-2">Payment Successful!</h1>
         <p className="text-muted-foreground mb-6 text-center">
-          You have successfully paid {amount} USDC to {truncateAddress(recipientAddress)}, who will receive {estimatedReceived} {toToken?.symbol}
+          You have successfully paid {amount} USDC to {recipientAddress.replace(/^ethereum:/i, '').substring(0, 8)}...{recipientAddress.replace(/^ethereum:/i, '').substring(36)}, who will receive {estimatedReceived} {toToken?.symbol}
         </p>
         <div className="flex gap-4 w-full">
           <Button variant="outline" className="flex-1" asChild>
@@ -226,15 +238,15 @@ function IntentPayContent() {
                 <input
                   type="text"
                   value={recipientAddress}
-                  onChange={(e) => setRecipientAddress(e.target.value)}
+                  onChange={(e) => setRecipientAddress(e.target.value.replace(/^ethereum:/i, ''))}
                   placeholder="Enter or paste wallet address"
-                  className="w-full px-3 py-2 rounded-lg bg-accent/50 focus:bg-accent focus:outline-none"
+                  className="w-full px-3 py-2 rounded-lg bg-accent/50 focus:bg-accent focus:outline-none text-sm truncate"
                 />
                 {recipientAddress && (
                   <button 
                     type="button" 
                     onClick={clearAddress}
-                    className="absolute right-12 top-2.5 text-muted-foreground hover:text-foreground"
+                    className="absolute right-14 top-2 text-muted-foreground hover:text-foreground"
                     aria-label="Clear recipient address"
                   >
                     <CircleX className="h-4 w-4" />
@@ -253,9 +265,11 @@ function IntentPayContent() {
               </div>
               
               {recipientAddress && (
-                <div className="flex items-center gap-2 mt-2 px-2">
+                <div className="flex items-center gap-2 mt-2 px-2 overflow-hidden">
                   <Web3Avatar address={recipientAddress} size={24} />
-                  <span className="text-sm">{truncateAddress(recipientAddress)}</span>
+                  <div className="text-xs text-muted-foreground overflow-x-auto whitespace-nowrap w-full pb-1 font-mono">
+                    {recipientAddress}
+                  </div>
                 </div>
               )}
             </div>
@@ -273,7 +287,7 @@ function IntentPayContent() {
               >
                 <div className="flex items-center gap-2">
                   {selectedChain && (
-                    <Image
+                    <img 
                       src={selectedChain.logo}
                       alt={selectedChain.name}
                       width={24}
@@ -299,7 +313,7 @@ function IntentPayContent() {
                       }`}
                       aria-label={`Select ${chain.name} blockchain`}
                     >
-                      <Image 
+                      <img 
                         src={chain.logo}
                         alt={chain.name}
                         width={24}
@@ -330,17 +344,27 @@ function IntentPayContent() {
                   className="bg-transparent border-none text-2xl font-medium outline-none w-[70%]"
                 />
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background">
-                  <Image 
-                    src="/assets/tokens/usdc.svg"
-                    alt="USDC"
-                    width={24}
-                    height={24}
-                    className="rounded-full"
-                    onError={(e) => {
-                      // Fallback to external URL if local image fails
-                      (e.target as HTMLImageElement).src = "https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png";
-                    }}
-                  />
+                  {sourceTokenInfo ? (
+                    <img 
+                      src={sourceTokenInfo.logoURI}
+                      alt="USDC"
+                      width={24}
+                      height={24}
+                      className="rounded-full"
+                      onError={(e) => {
+                        // Fallback to external URL if API image fails
+                        (e.target as HTMLImageElement).src = "https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png";
+                      }}
+                    />
+                  ) : (
+                    <img 
+                      src="https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png"
+                      alt="USDC"
+                      width={24}
+                      height={24}
+                      className="rounded-full"
+                    />
+                  )}
                   <span>USDC</span>
                 </div>
               </div>
@@ -369,14 +393,14 @@ function IntentPayContent() {
                   className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background hover:bg-background/80"
                 >
                   {toToken && (
-                    <Image 
+                    <img 
                       src={toToken.logo}
                       alt={toToken.symbol}
                       width={24}
                       height={24}
                       className="rounded-full"
                       onError={(e) => {
-                        // Fallback to external URL if local image fails
+                        // Fallback to a reliable token image source
                         const symbol = toToken.symbol.toLowerCase();
                         (e.target as HTMLImageElement).src = `https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png`;
                       }}
@@ -400,14 +424,14 @@ function IntentPayContent() {
                       toToken?.symbol === token.symbol ? 'bg-primary/10 text-primary' : 'hover:bg-accent'
                     }`}
                   >
-                    <Image 
+                    <img 
                       src={token.logo}
                       alt={token.symbol}
                       width={24}
                       height={24}
                       className="rounded-full"
                       onError={(e) => {
-                        // Fallback to external URL if local image fails
+                        // Fallback to a reliable token image source
                         (e.target as HTMLImageElement).src = `https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png`;
                       }}
                     />
