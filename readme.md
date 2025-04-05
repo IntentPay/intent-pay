@@ -15,27 +15,27 @@ We create a frictionless financial experience that removes the complexity of gas
 
 ## Core Features
 
-- **USDC-Priced Cross-Chain Swaps**:
+- **💱 USDC-Priced Cross-Chain Swaps**:
   All transactions priced in USDC regardless of destination chain or token
-- **World App Payment Integration**:
+- **💳 World App Payment Integration**:
   Pay for swaps directly through World App without connecting personal wallets
-- **QR Code Address Scanning**:
+- **📱 QR Code Address Scanning**:
   Easily input recipient addresses by scanning QR codes
-- **Gasless Transactions**:
+- **⛽ Gasless Transactions**:
   Execute transfers without managing gas fees using IntentPay's official Circle wallet
-- **Intent-Based Trading**:
+- **🎯 Intent-Based Trading**:
   Submit trade intentions that get executed optimally via 1inch
-- **Human Verification**:
+- **👋 Human Verification**:
   Privacy-preserving verification using World ID and zero-knowledge proofs
-- **Seamless Multi-Device Support**:
+- **💻 Seamless Multi-Device Support**:
   Deliver a smooth experience across various devices, ensuring universal access and compatibility.
-- **Immersive Haptic Feedback**:
+- **🤖 Immersive Haptic Feedback**:
   Enhance user interactions with responsive tactile feedback, making the experience more engaging and satisfying. This feature is designed to improve accessibility for visually impaired users and enrich the overall user experience.
-- **Multi-chain Support**:
+- **𖢻 Multi-chain Support**:
   Transact across multiple blockchains seamlessly
-- **Enhanced Security**:
+- **🔒 Enhanced Security**:
   Passkey authentication and risk-based transaction screening
-- **Portfolio Tracking**:
+- **📊 Portfolio Tracking**:
   View balances and transaction history across supported chains
 
 ## Technical Architecture
@@ -212,6 +212,7 @@ flowchart TD
    - Portfolio tracking
 
 3. **Phase 3: Enhanced Features**
+
    - World App payment integration
    - QR code scanning for addresses
    - Multi-chain support expansion
