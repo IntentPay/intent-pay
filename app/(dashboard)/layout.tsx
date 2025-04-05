@@ -102,7 +102,7 @@ function DesktopNav() {
           <ShoppingCart className="h-5 w-5" />
         </NavItem>
 
-        <NavItem href="/pageB" label="World Payment">
+        <NavItem href="/pageD" label="World Payment">
           <DollarSign className="h-5 w-5" />
         </NavItem>
 
@@ -267,7 +267,7 @@ function MobileBottomNav({ onOpenQRScanner }: MobileBottomNavProps) {
   const navItems = [
     { href: '/', label: 'Home', icon: Home },
     { href: '/intent-pay', label: 'Intent Pay', icon: CreditCard },
-    { href: '/pageB', label: 'World Pay', icon: DollarSign },
+    { href: '/pageD', label: 'World Pay', icon: DollarSign },
     { href: '/setting', label: 'Settings', icon: Settings }
   ];
 

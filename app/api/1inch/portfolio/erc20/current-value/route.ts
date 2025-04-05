@@ -23,15 +23,17 @@ export async function GET(request: NextRequest) {
 
   try {
     const response = await axios.get(
-      'https://api.1inch.dev/portfolio/portfolio/v4/overview/erc20/current_value',
+      'https://api.1inch.dev/portfolio/portfolio/v4/overview/erc20/details',
       {
         headers: {
-          'Authorization': `Bearer ${process.env.ONEINCH_API_KEY}`,
+          'Authorization': `Bearer bU3wtFzdNutmkzsdlSuEtYgrvC6SUKiA`,
           'Accept': 'application/json',
         },
-        params: { address, chainId: Number(chainId), useCache }
+        params: { address, chain_id: Number(chainId), use_cache: useCache }
       }
     );
+
+    console.log('response', response.data)
 
     return NextResponse.json(response.data);
   } catch (error) {
