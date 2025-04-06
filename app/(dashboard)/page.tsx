@@ -28,6 +28,18 @@ interface WorldIDUser {
   address: string;
 }
 
+// Intent type
+interface Intent {
+  id: string;
+  amount: number;
+  token: string;
+  recipient: string;
+  status: string;
+  timestamp: string;
+  fee?: string;
+  totalWLD?: number;
+}
+
 // TODO: Integrate the World Chant and Notification feature.
 const sendHapticSuccessCommand = () =>
   MiniKit.commands.sendHapticFeedback({
@@ -41,6 +53,7 @@ export default function WalletHomePage() {
   const [loading, setLoading] = useState(true);
   const [addressCopied, setAddressCopied] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [intents, setIntents] = useState<Intent[]>([]);
 
   // Mockup wallet data (for development)
   const walletAddress = user?.address || '0x67aad1351bb0665d2a560a52bef9ab8621567d25';
@@ -59,6 +72,12 @@ export default function WalletHomePage() {
         const userData = localStorage.getItem('worldid_user');
         if (userData) {
           setUser(JSON.parse(userData));
+        }
+
+        // Load intents from local storage
+        const intentsData = localStorage.getItem('intents');
+        if (intentsData) {
+          setIntents(JSON.parse(intentsData));
         }
 
         // Also try to get the latest data from MiniKit
@@ -215,12 +234,33 @@ export default function WalletHomePage() {
               <CardTitle>Your Intents</CardTitle>
               <CardDescription>Trading intents you've created</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center py-8">
-              <div className="text-center text-gray-500">
-                <p>You haven't created any intents yet</p>
-                <Button className="mt-4">Create Intent</Button>
-              </div>
+            <CardContent>
+              {intents.length > 0 ? (
+                <div className="space-y-4">
+                  {intents.map((intent) => (
+                    <div key={intent.id} className="flex justify-between items-center border-b pb-2">
+                      <div>
+                        <div className="font-medium">Payment to {truncateAddress(intent.recipient, 6, 4)}</div>
+                        <div className="text-sm text-gray-500">{new Date(intent.timestamp).toLocaleDateString()}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium">{intent.amount} {intent.token}</div>
+                        <div className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{intent.status}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  <p>You haven't created any intents yet</p>
+                </div>
+              )}
             </CardContent>
+            <CardFooter>
+              <Link href="/intent-pay" className="w-full">
+                <Button className="w-full">Create Intent</Button>
+              </Link>
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
