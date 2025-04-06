@@ -10,6 +10,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Wallet, ArrowRight, X } from 'lucide-react';
+import Image from 'next/image';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Hardcoded chain information from intent-pay
 const CHAIN_INFO = [
