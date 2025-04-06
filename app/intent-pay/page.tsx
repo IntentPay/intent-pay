@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, FormEvent, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
   User2, 
@@ -26,20 +26,23 @@ import {
   Globe,
   Loader,
   DollarSign,
-  ScanLine
+  ScanLine,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Web3Avatar } from '@/components/wallet/Web3Avatar';
 import { SendForm } from '@/components/SendForm';
-import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SUPPORTED_CHAINS, CHAIN_NAMES } from '@/lib/1inch/config';
 import Image from 'next/image';
 import ApplePayButton from '@/components/applePay/ApplePay';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { getMultiChainTokenList, getTokensByChain, TokenInfoDto, getUsdcTokenInfo, USDC_ADDRESSES } from '@/lib/1inch/token';
 import { useToast } from '@/components/ui/use-toast';
 import { QRScannerModal } from '@/components/qr/QRScanner';
@@ -66,6 +69,7 @@ const formatAddress = (address: string) => {
 // Component wrapping useSearchParams
 function IntentPayContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { toast } = useToast();
   
   // Get address param from URL
@@ -78,7 +82,7 @@ function IntentPayContent() {
   const [selectedChainId, setSelectedChainId] = useState<number>(8453); // Default to Base chain
   const [showTokenSelector, setShowTokenSelector] = useState(false);
   const [estimatedReceived, setEstimatedReceived] = useState('0');
-  const [fee, setFee] = useState('0');
+  const [fee, setFee] = useState('0.003'); // Set a reasonable default gas fee
   const [quoteData, setQuoteData] = useState<QuoteOutput | null>(null);
   const [selectedToken, setSelectedToken] = useState<TokenInfoDto | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -98,6 +102,8 @@ function IntentPayContent() {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [isQuoteLoading, setIsQuoteLoading] = useState(false);
   const [destinationChainId, setDestinationChainId] = useState<number>(8453); // Default to Base
+  const [ethPriceUSD, setEthPriceUSD] = useState<number>(3500); // Set a reasonable default ETH price
+  const [showSourceChainSelector, setShowSourceChainSelector] = useState(false);
   
   // Chain states
   const [availableChains, setAvailableChains] = useState<number[]>([1, 56, 137, 42161, 100, 10, 8453, 43114, 324, 59144]);
@@ -410,8 +416,8 @@ function IntentPayContent() {
         
         // 显示错误通知
         toast({
-          title: "获取报价失败",
-          description: `API错误: ${error.message || '未知错误'}。使用估算值替代。`,
+          title: "Failed to get quote",
+          description: `API error: ${error.message || 'Unknown error'}。Using estimated values instead.`,
           variant: "destructive"
         });
         
@@ -503,11 +509,6 @@ function IntentPayContent() {
     }
     
     try {
-      // Calculate WLD amount (example conversion rate 1 USDC = 1.35 WLD)
-      const conversionRate = 1.35;
-      const amountNum = parseFloat(amount);
-      const wldAmount = amountNum * conversionRate;
-      
       // Create World ID payment payload
       const payload: PayCommandInput = {
         reference: `intent-pay-${Date.now()}`,
@@ -515,10 +516,10 @@ function IntentPayContent() {
         tokens: [
           {
             symbol: Tokens.WLD,
-            token_amount: tokenToDecimals(wldAmount, Tokens.WLD).toString()
+            token_amount: tokenToDecimals(parseFloat(estimatedReceived), Tokens.WLD).toString()
           }
         ],
-        description: `Pay ${amount} ${selectedToken.symbol} with ${wldAmount.toFixed(4)} WLD`
+        description: `Pay ${amount} ${selectedToken.symbol} with ${parseFloat(estimatedReceived).toFixed(4)} WLD`
       };
       
       // Show processing toast
@@ -631,7 +632,186 @@ function IntentPayContent() {
       console.error('Failed to read clipboard:', error);
     }
   };
-  
+
+  // 使用 World App 进行支付
+  const handleWorldAppPayment = async () => {
+    if (!MiniKit.isInstalled()) {
+      toast({
+        title: "World App not installed",
+        description: "Please install World App to continue payment",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // 计算总支付金额 (输入金额 + 手续费)
+    const amountNum = parseFloat(amount);
+    const feeNum = parseFloat(fee);
+    const feeUSD = ethPriceUSD ? feeNum * ethPriceUSD : 0;
+    const totalUSD = amountNum + feeUSD;
+
+    // 将总 USD 金额转换为 WLD
+    const conversionRate = 1 / 0.74;
+    const totalWLD = totalUSD * conversionRate;
+
+    console.log(`Payment: ${amountNum} USDC + ${fee} ETH (${feeUSD.toFixed(2)} USD) = ${totalWLD.toFixed(4)} WLD`);
+
+    // 创建一个新的 intent 记录
+    const newIntent = {
+      id: `intent-${Date.now()}`,
+      amount: amountNum,
+      token: 'USDC',
+      recipient: recipientAddress,
+      status: 'completed',
+      timestamp: new Date().toISOString(),
+      fee: fee,
+      totalWLD: totalWLD
+    };
+
+    // 将新的 intent 添加到本地存储
+    const existingIntents = JSON.parse(localStorage.getItem('intents') || '[]');
+    localStorage.setItem('intents', JSON.stringify([newIntent, ...existingIntents]));
+
+    try {
+      // Create World ID payment payload
+      const payload: PayCommandInput = {
+        reference: `intent-pay-${Date.now()}`, // 生成唯一参考ID
+        to: recipientAddress, // 使用用户输入的收款地址
+        tokens: [
+          {
+            symbol: Tokens.WLD,
+            token_amount: tokenToDecimals(totalWLD, Tokens.WLD).toString()
+          }
+        ],
+        description: `Pay ${amount} USDC + ${fee} ETH gas fee ($${feeUSD.toFixed(2)}) = ${totalWLD.toFixed(2)} WLD`
+      };
+
+      const { finalPayload } = await MiniKit.commandsAsync.pay(payload);
+
+      if (finalPayload.status === 'success') {
+        toast({
+          title: "Payment successful!",
+          description: `You have paid ${totalWLD.toFixed(2)} WLD (including ${amount} USDC + ${fee} ETH gas fee)`,
+          variant: "default"
+        });
+
+        // 支付成功后导航到 dashboard
+        router.push('/dashboard');
+      } else {
+        toast({
+          title: "Payment failed",
+          description: "Transaction failed, please try again",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("World App payment error:", error);
+      toast({
+        title: "Payment failed",
+        description: "Error processing payment, please try again",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // 处理 Apple Pay 支付成功回调
+  const handleApplePaySuccess = () => {
+    const amountNum = parseFloat(amount);
+    const feeNum = parseFloat(fee);
+    const feeUSD = ethPriceUSD ? feeNum * ethPriceUSD : 0;
+    const totalUSD = amountNum + feeUSD;
+
+    // 创建一个新的 intent 记录
+    const newIntent = {
+      id: `intent-${Date.now()}`,
+      amount: amountNum,
+      token: 'USDC',
+      recipient: recipientAddress,
+      status: 'completed',
+      timestamp: new Date().toISOString(),
+      fee: fee,
+      totalUSD: totalUSD
+    };
+
+    // 将新的 intent 添加到本地存储
+    const existingIntents = JSON.parse(localStorage.getItem('intents') || '[]');
+    localStorage.setItem('intents', JSON.stringify([newIntent, ...existingIntents]));
+
+    toast({
+      title: "Apple Pay payment successful!",
+      description: `You have paid ${amountNum.toFixed(2)} USDC + ${fee} ETH gas fee ($${feeUSD.toFixed(2)}) = $${totalUSD.toFixed(2)}`,
+      variant: "default"
+    });
+
+    // 支付成功后导航到 dashboard
+    router.push('/dashboard');
+  };
+
+  // 处理 Apple Pay 支付失败回调
+  const handleApplePayError = () => {
+    toast({
+      title: "Apple Pay payment failed",
+      description: "Error processing payment, please try again",
+      variant: "destructive"
+    });
+  };
+
+  // 获取 ETH 价格
+  const fetchEthPrice = async () => {
+    try {
+      const response = await fetch('/api/tokenPrice');
+      const data = await response.json();
+
+      if (data.success && data.priceUSD) {
+        setEthPriceUSD(data.priceUSD);
+        console.log(`ETH price: $${data.priceUSD}`);
+      } else {
+        console.error('Unable to get ETH price:', data.error);
+        console.log('Using default ETH price: $3500');
+      }
+    } catch (error) {
+      console.error('Error getting ETH price:', error);
+      console.log('Using default ETH price: $3500');
+    }
+  };
+
+  // 获取最佳链的信息
+  const [bestChainData, setBestChainData] = useState<{
+    bestChain: { id: number; name: string };
+    fees: { [chainId: string]: { fee: string; feeUSD: number; chainName: string } };
+    timestamp: number;
+  } | null>(null);
+  const [isBestChainLoading, setIsBestChainLoading] = useState(false);
+
+  const fetchBestChain = async () => {
+    try {
+      setIsBestChainLoading(true);
+      const response = await fetch('/api/bestChain');
+      const data = await response.json();
+
+      if (data) {
+        setBestChainData(data);
+        console.log('Best chain data:', data);
+      }
+    } catch (error) {
+      console.error('Error getting best chain info:', error);
+    } finally {
+      setIsBestChainLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEthPrice();
+
+    // 每 60 秒更新一次 ETH 价格
+    const ethPriceIntervalId = setInterval(fetchEthPrice, 60000);
+
+    // 清理函数
+    return () => {
+      clearInterval(ethPriceIntervalId);
+    };
+  }, []);
+
   if (paymentSuccess) {
     return (
       <div className="container max-w-md mx-auto p-4 flex flex-col items-center justify-center min-h-[70vh]">
@@ -652,14 +832,14 @@ function IntentPayContent() {
       </div>
     );
   }
-  
+
   // UI components from shadcn
   // If these components don't exist, we'll create placeholders
   const Separator = () => <div className="w-full h-px bg-[#2a3156] my-4"></div>;
   const Skeleton = ({ className }: { className?: string }) => (
     <div className={`bg-[#232853] animate-pulse rounded ${className || ''}`}></div>
   );
-  
+
   // Fix the network logo type safety issue by explicitly defining valid chain IDs
   const SUPPORTED_CHAIN_IDS = [1, 56, 137, 42161, 100, 10, 8453, 43114, 324, 59144] as const;
   type SupportedChainId = typeof SUPPORTED_CHAIN_IDS[number];
@@ -668,7 +848,7 @@ function IntentPayContent() {
   const NetworkIcon = ({ chainId }: { chainId: number }) => {
     const chainInfo = CHAIN_INFO.find(chain => chain.id === chainId);
     const networkName = chainInfo?.name || CHAIN_NAMES[chainId.toString() as keyof typeof CHAIN_NAMES] || "Unknown";
-    
+
     return (
       <div className="flex items-center gap-2">
         <div className="h-5 w-5 relative overflow-hidden rounded-full bg-[#232853]">
@@ -694,7 +874,7 @@ function IntentPayContent() {
   const NetworkIconOnly = ({ chainId }: { chainId: number }) => {
     const chainInfo = CHAIN_INFO.find(chain => chain.id === chainId);
     const networkName = chainInfo?.name || CHAIN_NAMES[chainId.toString() as keyof typeof CHAIN_NAMES] || "Unknown";
-    
+
     return (
       <div className="h-8 w-8 relative overflow-hidden rounded-full flex items-center justify-center">
         {chainInfo?.icon ? (
@@ -725,7 +905,7 @@ function IntentPayContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0d1129] to-[#10173a] pb-16">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-[#191d3e] to-[#121530] text-white overflow-x-hidden max-w-full">
       {/* 顶部头像和背景 */}
       <div className="relative w-full h-[220px] overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-[#10173a] to-[#0d1129] opacity-90 z-10"></div>
@@ -768,26 +948,30 @@ function IntentPayContent() {
               </div>
               <div className="flex justify-between">
                 <span className="text-[#8a8dbd]">Gas Fee</span>
-                <span className="text-white">{fee} USDC</span>
+                <span className="text-white">{fee} ETH {ethPriceUSD ? `($${(parseFloat(fee) * ethPriceUSD).toFixed(2)})` : ''}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#8a8dbd]">Slippage</span>
                 <span className="text-white">{slippage}%</span>
               </div>
-              
+
               <div className="border-t border-[#2a3156] my-3 pt-3">
                 <div className="flex justify-between">
                   <span className="text-[#c2c6ff] font-medium">Total Amount</span>
                   <span className="text-white font-medium hologram-text">
-                    {amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0 
-                      ? (parseFloat(amount) + parseFloat(fee)).toFixed(4)
-                      : parseFloat(fee).toFixed(4)} USDC
+                    {(() => {
+                      const amountUSDC = amount && !isNaN(parseFloat(amount)) ? parseFloat(amount) : 0;
+                      const feeETH = parseFloat(fee);
+                      const feeUSD = ethPriceUSD ? feeETH * ethPriceUSD : 0;
+                      const totalUSD = amountUSDC + feeUSD;
+                      return `${amountUSDC.toFixed(2)} USDC + $${feeUSD.toFixed(2)} = $${totalUSD.toFixed(2)}`;
+                    })()}
                   </span>
                 </div>
               </div>
             </div>
           </div>
-          
+
           {/* 支付详情输入和当前代币 */}
           <div className="space-y-6">
             {/* 收款地址输入区域 */}
@@ -840,7 +1024,7 @@ function IntentPayContent() {
                 <p className="text-[#ff2a6d] text-sm mt-1 pink-neon-text">Invalid Ethereum address</p>
               )}
             </div>
-            
+
             {/* 金额输入和代币选择 */}
             <div className="space-y-2">
               <label htmlFor="amount" className="text-[#c2c6ff] text-sm font-medium block neon-text">
@@ -851,6 +1035,8 @@ function IntentPayContent() {
                   <Input
                     id="amount"
                     type="number"
+                    inputMode="decimal"
+                    pattern="[0-9]*\.?[0-9]*"
                     placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
@@ -863,16 +1049,39 @@ function IntentPayContent() {
                 <Button 
                   type="button" 
                   onClick={() => setShowTokenSelector(true)}
-                  className="bg-[#232853] hover:bg-[#2a3156] text-[#c2c6ff] border border-[#2a3156] h-10 px-3 button-hover"
+                  className="bg-[#232853] hover:bg-[#2a3156] text-[#c2c6ff] border border-[#2a3156] h-10 px-3"
                 >
                   <ChevronsUpDown className="h-4 w-4 mr-1" />
-                  <span>Token</span>
+                  Token
                 </Button>
               </div>
             </div>
-            
-            {/* Destination Chain and Settings */}
+
+            {/* 源鏈和目標鏈選擇 */}
             <div className="flex gap-2 mb-4">
+              <Button 
+                type="button" 
+                onClick={() => setShowSourceChainSelector(true)}
+                className="flex-1 bg-[#232853] hover:bg-[#2a3156] text-[#c2c6ff] border border-[#2a3156]"
+                aria-label="Select source chain"
+                title="Select source chain"
+              >
+                <div className="flex items-center">
+                  <NetworkIconOnly chainId={selectedChainId} />
+                  <span className="ml-2">
+                    {bestChainData && bestChainData.bestChain.id === selectedChainId ? (
+                      <span className="flex items-center">
+                        <span>{CHAIN_NAMES[selectedChainId.toString() as keyof typeof CHAIN_NAMES]}</span>
+                        <Badge variant="outline" className="ml-2 text-xs bg-green-500/20 text-green-400 border-green-500/30">
+                          Best (3 of 1)
+                        </Badge>
+                      </span>
+                    ) : (
+                      CHAIN_NAMES[selectedChainId.toString() as keyof typeof CHAIN_NAMES]
+                    )}
+                  </span>
+                </div>
+              </Button>
               <Button 
                 type="button" 
                 onClick={() => setShowDestinationChainSelector(true)}
@@ -880,8 +1089,10 @@ function IntentPayContent() {
                 aria-label="Select destination chain"
                 title="Select destination chain"
               >
-                <NetworkIconOnly chainId={destinationChainId} />
-                <span className="ml-2">{CHAIN_NAMES[destinationChainId.toString() as keyof typeof CHAIN_NAMES]}</span>
+                <div className="flex items-center">
+                  <NetworkIconOnly chainId={destinationChainId} />
+                  <span className="ml-2">{CHAIN_NAMES[destinationChainId.toString() as keyof typeof CHAIN_NAMES]}</span>
+                </div>
               </Button>
               <Button 
                 type="button" 
@@ -893,10 +1104,10 @@ function IntentPayContent() {
                 <Settings className="h-4 w-4" />
               </Button>
             </div>
-            
+
             {/* 当前选择的Token和Chain信息显示 */}
             <div className="bg-[#232853]/50 rounded-lg p-3 mb-4 border border-[#2a3156]">
-              <h3 className="text-[#c2c6ff] text-sm font-medium mb-2">当前选择</h3>
+              <h3 className="text-[#c2c6ff] text-sm font-medium mb-2">Current Selection</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center">
                   <div className="bg-[#191d3e] rounded-full h-6 w-6 flex items-center justify-center mr-2 overflow-hidden">
@@ -905,7 +1116,7 @@ function IntentPayContent() {
                     )}
                   </div>
                   <div>
-                    <p className="text-xs text-[#8a8dbd]">网络</p>
+                    <p className="text-xs text-[#8a8dbd]">Network</p>
                     <p className="text-sm text-white">
                       {typeof destinationChainId === 'number' && CHAIN_NAMES[destinationChainId.toString() as keyof typeof CHAIN_NAMES] || 'Unknown'}
                     </p>
@@ -927,19 +1138,19 @@ function IntentPayContent() {
                     )}
                   </div>
                   <div>
-                    <p className="text-xs text-[#8a8dbd]">代币</p>
+                    <p className="text-xs text-[#8a8dbd]">Token</p>
                     <p className="text-sm text-white">{selectedToken?.symbol || "USDC"}</p>
                   </div>
                 </div>
               </div>
             </div>
-            
-            {/* Payment options - replacing the Pay Now button */}
+
+            {/* Payment options */}
             <div className="grid grid-cols-2 gap-3">
               <Button 
                 type="button" 
                 className="bg-[#0074d9] hover:bg-[#00a3e2] text-white font-medium py-5 transition-all duration-200"
-                onClick={() => {}}
+                onClick={handleWorldAppPayment}
                 disabled={!isValidAddress || !amount || parseFloat(amount) <= 0}
               >
                 <Globe className="h-5 w-5 mr-2" />
@@ -947,33 +1158,55 @@ function IntentPayContent() {
               </Button>
               <div>
                 <ApplePayButton 
-                  amount={amount ? parseFloat(amount) : 0}
-                  label={`Pay ${amount || '0.00'} USDC`}
-                  onSuccess={() => {
-                    toast({
-                      title: "Payment Successful",
-                      description: "Your payment was processed successfully!",
-                      variant: "default",
-                    });
-                    
-                    // Reset form after successful payment
-                    setAmount('');
-                    setRecipientAddress('');
-                  }}
-                  onError={() => {
-                    toast({
-                      title: "Payment Failed",
-                      description: "There was an error processing your payment. Please try again.",
-                      variant: "destructive",
-                    });
-                  }}
+                  amount={Math.ceil(parseFloat(amount || '0'))}
+                  label={`Pay ${Math.ceil(parseFloat(amount || '0'))} USD`}
+                  onSuccess={handleApplePaySuccess}
+                  onError={handleApplePayError}
                 />
               </div>
             </div>
           </div>
         </div>
       </div>
-      
+
+      {/* 顶部显示 Network 和 Best of 3 标签 */}
+      <div className="flex items-center justify-between mb-6 bg-[#1c2040] p-4 rounded-lg">
+        <div className="flex items-center space-x-2">
+          <div className="text-[#c2c6ff] text-sm">Network:</div>
+          <div className="flex items-center">
+            <NetworkIconOnly chainId={selectedChainId} />
+            <span className="ml-2 text-white">
+              {CHAIN_NAMES[selectedChainId.toString() as keyof typeof CHAIN_NAMES]}
+            </span>
+            {bestChainData && bestChainData.bestChain.id === selectedChainId && (
+              <Badge variant="outline" className="ml-2 text-xs bg-green-500/20 text-green-400 border-green-500/30">
+                Best (3 of 1)
+              </Badge>
+            )}
+          </div>
+        </div>
+        <Button 
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={fetchBestChain}
+          className="text-xs h-8 bg-[#232853] hover:bg-[#2a3156] text-[#c2c6ff] border border-[#2a3156]"
+          disabled={isBestChainLoading}
+        >
+          {isBestChainLoading ? (
+            <span className="flex items-center">
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              Loading...
+            </span>
+          ) : (
+            <span className="flex items-center">
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Get Best Network
+            </span>
+          )}
+        </Button>
+      </div>
+
       {/* 代币选择模态框 */}
       {showTokenSelector && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
@@ -1057,7 +1290,7 @@ function IntentPayContent() {
           </div>
         </div>
       )}
-      
+
       {/* 滑点设置模态框 */}
       {showSlippageSettings && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
@@ -1110,7 +1343,7 @@ function IntentPayContent() {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <label className="text-[#c2c6ff] font-medium block mb-2 neon-text">Transaction Fee</label>
                 <div className="relative">
@@ -1123,7 +1356,7 @@ function IntentPayContent() {
                     className="bg-[#10173a] border-[#2a3156] text-white focus:border-[#00f0ff] focus:ring-[#00f0ff] focus:ring-opacity-30 pr-14 input-focus"
                   />
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#8a8dbd]">
-                    USDC
+                    ETH
                   </div>
                 </div>
               </div>
@@ -1170,7 +1403,7 @@ function IntentPayContent() {
           }}
         />
       )}
-      
+
       {/* Destination Chain Selector Modal */}
       {showDestinationChainSelector && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -1184,7 +1417,7 @@ function IntentPayContent() {
             >
               <X className="h-5 w-5" />
             </button>
-            <h3 className="font-medium text-lg mb-3 text-white">选择网络</h3>
+            <h3 className="font-medium text-lg mb-3 text-white">Select Destination Chain</h3>
             <div className="space-y-2 max-h-[60vh] overflow-y-auto custom-scrollbar">
               {availableChains.map((chainId) => (
                 <button
@@ -1215,13 +1448,80 @@ function IntentPayContent() {
           </div>
         </div>
       )}
-      
+
+      {/* 源鏈選擇模態框 */}
+      {showSourceChainSelector && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-[#191d3e] rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-[#2a3156]">
+            <div className="p-4 border-b border-[#2a3156] flex justify-between items-center">
+              <h3 className="text-lg font-medium text-white">Select Source Chain</h3>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setShowSourceChainSelector(false)}
+                className="h-8 w-8 text-[#8a8dbd] hover:text-white hover:bg-[#232853]"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-2">
+                {Object.entries(CHAIN_NAMES).map(([chainId, chainName]) => {
+                  const isSelected = selectedChainId === parseInt(chainId);
+                  const isBestChain = bestChainData && bestChainData.bestChain.id === parseInt(chainId);
+                  const chainFee = bestChainData?.fees[chainId]?.fee || '0.003';
+                  const chainFeeUSD = bestChainData?.fees[chainId]?.feeUSD || 0;
+                  
+                  return (
+                    <button
+                      key={chainId}
+                      type="button"
+                      className={`flex items-center justify-between w-full p-3 rounded-lg text-left transition-all ${
+                        isSelected 
+                          ? 'bg-[#0074d9]/20 border border-[#0074d9]'
+                          : 'bg-[#232853] border border-[#2a3156] hover:border-[#0074d9]'
+                      }`}
+                      onClick={() => {
+                        setSelectedChainId(parseInt(chainId));
+                        setShowSourceChainSelector(false);
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-[#30365c] flex items-center justify-center overflow-hidden">
+                          <NetworkIconOnly chainId={parseInt(chainId)} />
+                        </div>
+                        <div>
+                          <div className="font-medium text-white flex items-center">
+                            {chainName}
+                            {isBestChain && (
+                              <Badge variant="outline" className="ml-2 text-xs bg-green-500/20 text-green-400 border-green-500/30">
+                                Best
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-[#8a8dbd]">
+                            Gas Fee: {chainFee} ETH (${chainFeeUSD.toFixed(2)})
+                          </div>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <Check className="h-5 w-5 text-[#0074d9]" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Transaction Quote Details */}
       <div className="bg-[#1c2040] p-6 rounded-lg shadow-inner mb-4">
         <div className="flex items-center justify-between mb-6">
           <span className="text-[#c2c6ff] font-medium text-lg">Transaction Details</span>
         </div>
-        
+
         {/* Token Amount Info */}
         <div className="text-sm space-y-5 mt-4">
           <div className="flex justify-between items-center px-3 py-1">
@@ -1243,7 +1543,7 @@ function IntentPayContent() {
           </div>
           <div className="flex justify-between items-center px-3 py-1">
             <span className="text-[#8a8dbd]">Network Fee:</span>
-            <span className="font-medium">{fee} {selectedToken?.symbol || 'USDC'}</span>
+            <span className="font-medium">{fee} ETH {ethPriceUSD ? `($${(parseFloat(fee) * ethPriceUSD).toFixed(2)})` : ''}</span>
           </div>
           <div className="flex justify-between items-center px-3 py-1">
             <span className="text-[#8a8dbd]">Est. received:</span>
@@ -1263,6 +1563,18 @@ function IntentPayContent() {
               </div>
             </>
           )}
+          <div className="flex justify-between items-center px-3 py-1">
+            <span className="text-[#8a8dbd]">Total amount:</span>
+            <span className="font-medium">
+              {(() => {
+                const amountUSDC = amount && !isNaN(parseFloat(amount)) ? parseFloat(amount) : 0;
+                const feeETH = parseFloat(fee);
+                const feeUSD = ethPriceUSD ? feeETH * ethPriceUSD : 0;
+                const totalUSD = amountUSDC + feeUSD;
+                return `${amountUSDC.toFixed(2)} USDC + $${feeUSD.toFixed(2)} = $${totalUSD.toFixed(2)}`;
+              })()}
+            </span>
+          </div>
         </div>
       </div>
     </div>

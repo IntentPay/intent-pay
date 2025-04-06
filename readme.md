@@ -136,9 +136,7 @@ flowchart TD
 
 ### Circle Modular Wallet
 
-- **Smart Contract Wallets**: Non-custodial programmable wallet infrastructure
 - **Transaction Sponsorship**: Enable gasless transactions for users
-- **Passkey Authentication**: Secure access without seed phrases
 - **Multi-chain Support**: Seamless cross-chain experience
 
 ### 1inch API

@@ -58,7 +58,7 @@ const ApplePayButton: React.FC<ApplePayButtonProps> = ({
           label: label,
           amount: {
             currency: 'USD',
-            value: typeof amount === 'string' ? amount : amount.toString()
+            value: typeof amount === 'string' ? amount : Math.ceil(amount).toString()
           }
         }
       };
